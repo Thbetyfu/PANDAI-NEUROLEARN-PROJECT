@@ -1,29 +1,40 @@
 # PANDAI NEUROLEARN 2.0 - IoT Communication Protocol
 
-Protokol ini mengatur pertukaran data antara **Neuro-Client** (Edge Unit), **ESP32** (Hardware Unit), **PANDAI Dashboard**, dan **PANDAI LMS**.
+Protokol ini mengatur spesifikasi teknis pertukaran data antara **Neuro-Client**, **ESP32**, dan **PANDAI Ecosystem**.
 
-## 1. Konfigurasi Jaringan
-- **Protokol**: MQTT (Message Queuing Telemetry Transport)
+## 1. Data Abstraction Layer
+Setiap payload yang dikirim dari Neuro-Client ke Dashboard harus mengikuti skema kalkulasi berikut:
+
+| Parameter | Type | Range | Deskripsi |
+|-----------|------|-------|-----------|
+| `attention_index` | Float | 0.0 - 1.0 | Gabungan data EAR (Eye Aspect Ratio) dan Head-Pose. |
+| `stress_index` | Float | 0.0 - 1.0 | Kalkulasi tingkat stres berdasarkan fluktuasi GSR. |
+| `cognitive_fatigue`| Boolean| T/F | `True` jika HRV RMSSD < 20ms selama 5 menit berturut-turut. |
+
+## 2. Konfigurasi Jaringan & Topik
 - **Broker**: Local Raspberry Pi 4B (Mosquitto)
-- **Host**: `pandai-hub.local` atau `192.168.x.x`
+- **Host**: `192.168.x.x` (Internal Network)
 - **Port**: 1883
-- **QoS Level**: 
-  - `QoS 0`: Data Biometrik (Frekuensi tinggi, toleransi kehilangan data rendah)
-  - `QoS 2`: Perintah Intervensi & Safety (Kritis, tidak boleh hilang/duplikat)
 
-## 2. Struktur Topik (Topic Hierarchy)
-| Topic | Deskripsi | Publisher | Subscriber |
-|-------|-----------|-----------|------------|
-| `pandai/v1/bio/raw` | Data mentah biometrik (GSR, HRV) | ESP32 | Neuro-Client |
-| `pandai/v1/bio/processed` | Hasil abstraksi kognitif (Attention, Stress) | Neuro-Client | Dashboard/LMS |
-| `pandai/v1/actuator/tdcs` | Kontrol arus stimulator tDCS (mA) | Neuro-Client | ESP32 |
-| `pandai/v1/actuator/light` | Kontrol spektrum & kecerahan lampu | Neuro-Client | ESP32 |
-| `pandai/v1/system/safety` | Alert darurat & Impedansi tinggi | Any Unit | All |
+| Topic | Deskripsi | QoS | Direction |
+|-------|-----------|-----|-----------|
+| `pandai/v1/bio/raw` | Data mentah biometrik (GSR, HRV) | 0 | ESP32 → NC |
+| `pandai/v1/bio/processed` | Hasil abstraksi kognitif | 0 | NC → Dashboard |
+| `pandai/v1/actuator/tdcs` | Kontrol arus stimulator tDCS (mA) | 2 | NC → ESP32 |
+| `pandai/v1/actuator/light` | Kontrol spektrum & kecerahan lampu | 2 | NC → ESP32 |
+| `pandai/v1/system/safety` | Alert darurat & Impedansi tinggi | 2 | Any → All |
 
-## 3. Format Payload JSON
+## 3. Command Set (Neuro-Client → ESP32)
+Format perintah string untuk kontrol hardware cepat:
 
-### A. Telemetri Biometrik Terpadu
-Dikirim setiap 1000ms untuk pemantauan real-time di Dashboard.
+- `SET_CURRENT|val`: Mengatur arus tDCS (Range: 0.1 - 2.0 mA).
+- `SET_LIGHT|hex|intensity`: Mengatur warna COB LED (Contoh: `#FFFFFF|100`).
+- `EMERGENCY_OFF`: Memutus relay utama untuk penghentian total.
+
+## 4. Format Payload JSON (Standardized)
+Semua unit **WAJIB** menggunakan format ini. Jika format salah, unit penerima akan melempar **Error E03**.
+
+### Telemetri Biometrik
 ```json
 {
   "header": {
@@ -46,29 +57,19 @@ Dikirim setiap 1000ms untuk pemantauan real-time di Dashboard.
     }
   }
 }
+```
 
-{
-  "command": "ADJUST_INTERVENTION",
-  "params": {
-    "tdcs_target": 1.2,
-    "light_mode": "cool_white",
-    "transition_ms": 500
-  },
-  "safety_token": "AUTH-9912"
-}
+## 5. Threshold & Protokol Keamanan (Amigdala Shield)
+Safety logic yang berjalan sebagai proteksi berlapis.
 
-## 4. Threshold & Aksi Sistem
+- **EAR**: `< 0.22` selama 5 detik → Trigger: Tingkatkan kecerahan lampu.
+- **GSR**: Kenaikan `> 15%` dalam 30 detik → Trigger: tDCS 1.0mA (Alpha Stim).
+- **Impedansi**: `> 50,000 Ohm` → **HARD CUT-OFF** via Mechanical Relay.
+- **Watchdog**: Jika heartbeat MQTT hilang dalam 5 detik, ESP32 reset ke 0mA secara otomatis.
 
-| Parameter | Threshold | Aksi Sistem |
-|-----------|-----------|-------------|
-| **EAR (Drowsiness)** | < 0.22 (5 detik) | Tingkatkan Kecerahan Lampu (Wake-up call) |
-| **GSR (Stress)** | Kenaikan > 15% (30 detik) | Aktifkan tDCS 1.0mA (Calm/Alpha Stim) |
-| **HRV (Fatigue)** | RMSSD < 25ms | Trigger LMS: "Istirahat Sejenak & Minigame" |
-| **Impedance** | > 50,000 Ohm | **SAFETY SHUTDOWN** & Alert ke Dashboard |
-
-## 5. Protokol Keamanan (Safety Layer)
-
-- **Watchdog Timer**: Jika ESP32 tidak menerima heartbeat dari Raspberry Pi dalam 5 detik, arus tDCS otomatis diputus.
-- **Impedance Guard**: Sistem tidak akan memulai sesi jika resistansi kulit belum mencapai angka aman (< 20k Ohm).
-- **Emergency Cut-off**: Pesan MQTT pada topik safety dengan payload `CRITICAL_STOP` akan memicu relay mekanis untuk memutus jalur baterai.
-
+## 6. Error Codes Reference
+| Code | Name | Deskripsi |
+|------|------|-----------|
+| **E01** | Sensor Disconnected | Koneksi fisik ke sensor GSR/Headset terputus. |
+| **E02** | High Impedance | Resistansi kulit terlalu tinggi (>50kOhm). |
+| **E03** | Local AI Timeout | Ollama tidak memberikan respon dalam waktu batas. |
