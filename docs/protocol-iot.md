@@ -1,30 +1,67 @@
-# IoT Communication Protocol - PANDAI
+# PANDAI NEUROLEARN 2.0 - IoT Communication Protocol
 
-## MQTT Configuration
-- **Broker**: (TBD - e.g., local RPi or Cloud)
+Protokol ini mengatur pertukaran data antara **Neuro-Client** (Edge Unit), **ESP32** (Hardware Unit), **PANDAI Dashboard**, dan **PANDAI LMS**.
+
+## 1. Konfigurasi Jaringan
+- **Protokol**: MQTT (Message Queuing Telemetry Transport)
+- **Broker**: Local Raspberry Pi 4B (Mosquitto)
+- **Host**: `pandai-hub.local` atau `192.168.x.x`
 - **Port**: 1883
-- **Root Topic**: `pandai/v1/`
+- **QoS Level**: 
+  - `QoS 0`: Data Biometrik (Frekuensi tinggi, toleransi kehilangan data rendah)
+  - `QoS 2`: Perintah Intervensi & Safety (Kritis, tidak boleh hilang/duplikat)
 
-## Topics
-| Topic | Description | Direction |
-|-------|-------------|-----------|
-| `pandai/v1/sensor/raw` | Raw biometric data (GSR, HRV) | NeuroClient -> LMS/Dashboard |
-| `pandai/v1/control/tdcs` | Control signals for tDCS | Dashboard -> NeuroClient |
-| `pandai/v1/alert` | Stress detection notifications | NeuroClient -> All |
+## 2. Struktur Topik (Topic Hierarchy)
+| Topic | Deskripsi | Publisher | Subscriber |
+|-------|-----------|-----------|------------|
+| `pandai/v1/bio/raw` | Data mentah biometrik (GSR, HRV) | ESP32 | Neuro-Client |
+| `pandai/v1/bio/processed` | Hasil abstraksi kognitif (Attention, Stress) | Neuro-Client | Dashboard/LMS |
+| `pandai/v1/actuator/tdcs` | Kontrol arus stimulator tDCS (mA) | Neuro-Client | ESP32 |
+| `pandai/v1/actuator/light` | Kontrol spektrum & kecerahan lampu | Neuro-Client | ESP32 |
+| `pandai/v1/system/safety` | Alert darurat & Impedansi tinggi | Any Unit | All |
 
-## JSON Format Example (Sensor Data)
+## 3. Format Payload JSON
+
+### A. Telemetri Biometrik Terpadu
+Dikirim setiap 1000ms untuk pemantauan real-time di Dashboard.
 ```json
 {
-  "device_id": "NC-001",
-  "timestamp": "2026-02-23T13:16:00Z",
-  "data": {
-    "gsr": 0.45,
-    "hrv": 72,
-    "stress_level": "medium"
+  "header": {
+    "device_id": "PANDAI-NC-01",
+    "session_id": "SESS-20260223",
+    "timestamp": "2026-02-23T13:16:00Z"
+  },
+  "payload": {
+    "metrics": {
+      "gsr_microsiemens": 0.45,
+      "hrv_rmssd_ms": 72.5,
+      "ear_score": 0.28,
+      "cognitive_load": 45.2
+    },
+    "hardware_state": {
+      "tdcs_output_ma": 1.5,
+      "lamp_intensity": 80,
+      "skin_impedance_ohm": 12500,
+      "battery_level": 92
+    }
   }
 }
-```
 
-## Threshold Biosensor
-- **GSR Stress**: > 0.8 uS increase in < 2s.
-- **HRV Low**: < 40 ms (signaling focus or high stress).
+{
+  "command": "ADJUST_INTERVENTION",
+  "params": {
+    "tdcs_target": 1.2,
+    "light_mode": "cool_white",
+    "transition_ms": 500
+  },
+  "safety_token": "AUTH-9912"
+}
+
+## 4. Threshold & Aksi Sistem
+
+| Parameter | Threshold | Aksi Sistem |
+|-----------|-----------|-------------|
+| **EAR (Drowsiness)** | < 0.22 (5 detik) | Tingkatkan Kecerahan Lampu (Wake-up call) |
+| **GSR (Stress)** | Kenaikan > 15% (30 detik) | Aktifkan tDCS 1.0mA (Calm/Alpha Stim) |
+| **HRV (Fatigue)** | RMSSD < 25ms | Trigger LMS: "Istirahat Sejenak & Minigame" |
+| **Impedance** | > 50,000 Ohm | **SAFETY SHUTDOWN** & Alert ke Dashboard |
