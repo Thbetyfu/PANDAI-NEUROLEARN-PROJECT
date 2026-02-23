@@ -65,3 +65,10 @@ Dikirim setiap 1000ms untuk pemantauan real-time di Dashboard.
 | **GSR (Stress)** | Kenaikan > 15% (30 detik) | Aktifkan tDCS 1.0mA (Calm/Alpha Stim) |
 | **HRV (Fatigue)** | RMSSD < 25ms | Trigger LMS: "Istirahat Sejenak & Minigame" |
 | **Impedance** | > 50,000 Ohm | **SAFETY SHUTDOWN** & Alert ke Dashboard |
+
+## 5. Protokol Keamanan (Safety Layer)
+
+- **Watchdog Timer**: Jika ESP32 tidak menerima heartbeat dari Raspberry Pi dalam 5 detik, arus tDCS otomatis diputus.
+- **Impedance Guard**: Sistem tidak akan memulai sesi jika resistansi kulit belum mencapai angka aman (< 20k Ohm).
+- **Emergency Cut-off**: Pesan MQTT pada topik safety dengan payload `CRITICAL_STOP` akan memicu relay mekanis untuk memutus jalur baterai.
+
