@@ -1,0 +1,69 @@
+@startuml PANDAI_NEUROLEARN_Architecture
+
+!theme materia
+skinparam componentStyle rectangle
+skinparam nodesep 60
+skinparam ranksep 80
+
+title Arsitektur Sistem PANDAI NEUROLEARN 2.0 (Closed-Loop Ecosystem)
+
+cloud "Local Network (WiFi/MQTT)" as network #aliceblue
+
+package "Neuro-Client (Edge Computing Layer)" #lightgrey {
+    node "Raspberry Pi 4B" as rpi {
+        component [Decision Engine] as engine #salmon
+        component [Local LLM (Ollama)] as llm #lightblue
+        database [Local SQLite/JSON] as db
+    }
+    
+    node "ESP32 Controller" as esp {
+        component [tDCS Driver] as tdcs
+        component [Sensor Fusion Unit] as fusion
+    }
+}
+
+package "User Interface Layer" {
+    component [PANDAI LMS (Student App)] as lms #green
+    component [PANDAI Dashboard (Admin/Guru/Ortu)] as dashboard #orange
+}
+
+package "Hardware / Physical Layer" {
+    node "Headset PANDAI" as headset {
+        [Dry EEG/GSR Sensors] as sensors
+        [tDCS Electrodes] as electrodes
+    }
+    node "Smart Room" {
+        [IoT Smart Lamp (COB LED)] as lamp
+    }
+    [Kamera (Eye-Tracking)] as camera
+}
+
+' Relations: Physical to Neuro-Client
+sensors --> fusion : Raw Analog/Digital Data
+camera --> engine : Video Stream (EAR Calculation)
+fusion --> engine : Serial/I2C Data
+
+' Relations: Neuro-Client Internal
+engine <-> llm : Dialektika Prompt/Inference
+engine --> db : Log Kognitif & Intervensi
+engine --> tdcs : Control Signal (PWM)
+engine --> lamp : IoT Command
+
+' Relations: Neuro-Client to UI via Network
+engine -up-> network : MQTT Publish (Bio-stats)
+network -up-> lms : Receive Intervention Trigger
+network -up-> dashboard : Monitoring Data (Real-time)
+
+' Relations: UI to Physical
+tdcs --> electrodes : Stimulasi Arus 1-2mA
+lms -[hidden]- headset
+
+legend right
+  |= Color |= Layer |
+  |<#salmon>| Decision Engine (Brain) |
+  |<#lightblue>| Local AI (Ollama) |
+  |<#green>| Student LMS |
+  |<#orange>| Monitoring Dashboard |
+endlegend
+
+@enduml
