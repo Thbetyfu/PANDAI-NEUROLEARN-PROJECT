@@ -14,15 +14,15 @@ const PerformanceCard = ({ teacher, type = 'good' }) => {
 
   return (
     <div
-      className='flex flex-row items-start p-6 gap-[21px] w-[503px] h-[309px] rounded-[24px] border border-black/20'
+      className='flex flex-col md:flex-row items-start p-6 gap-[21px] w-full min-h-[309px] rounded-[24px] border border-black/20'
       style={{
         background: isGood
           ? 'linear-gradient(180deg, #FFFFFF 50%, #E9F2FB 100%)'
           : 'linear-gradient(180deg, #FFFFFF 50%, #FBE9E9 100%)'
       }}
     >
-      {/* LEFT: Profile Section (152px) */}
-      <div className='flex flex-col items-start gap-[21px] w-[152px]'>
+      {/* LEFT: Profile Section */}
+      <div className='flex flex-col items-start gap-[21px] w-full md:w-[152px]'>
         {/* Profile & Name */}
         <div className='flex flex-col items-start gap-[18px] w-full'>
           {/* Profile Image */}
@@ -102,10 +102,10 @@ const PerformanceCard = ({ teacher, type = 'good' }) => {
         </div>
       </div>
 
-      {/* RIGHT: Stats Section (282px) */}
-      <div className='flex flex-col items-start gap-2.5 w-[282px]'>
+      {/* RIGHT: Stats Section */}
+      <div className='flex flex-col items-start gap-2.5 w-full md:w-[282px]'>
         {/* Circular Progress & Stats */}
-        <div className='flex flex-row justify-center items-center py-[9px] gap-[10px] w-full h-[72px]'>
+        <div className='flex flex-row justify-center items-center py-[9px] gap-[10px] w-full h-[72px] md:h-auto'>
           {/* Dual Circle SVG */}
           <div className='relative w-[54px] h-[54px]'>
             <svg className='w-full h-full' viewBox='0 0 54 54'>
@@ -139,10 +139,10 @@ const PerformanceCard = ({ teacher, type = 'good' }) => {
           <div className='flex flex-col items-start gap-2'>
             {/* Main Stats */}
             <div className='flex flex-row items-end gap-1'>
-              <span className='font-semibold text-[32px] leading-[150%] tracking-[-0.04em] text-[#1D115A]'>
+              <span className='font-semibold text-[24px] md:text-[32px] leading-[150%] tracking-[-0.04em] text-[#1D115A]'>
                 {teacher.done}/{teacher.total}
               </span>
-              <span className='font-medium text-sm leading-[150%] tracking-[-0.04em] text-[#1D115A]'>
+              <span className='font-medium text-xs md:text-sm leading-[150%] tracking-[-0.04em] text-[#1D115A]'>
                 murid sudah paham
               </span>
             </div>
@@ -170,7 +170,7 @@ const PerformanceCard = ({ teacher, type = 'good' }) => {
         </div>
 
         {/* Evaluasi Box */}
-        <div className='flex flex-col items-start p-3 gap-2 w-full h-[166px] bg-white border border-black/10 rounded-xl overflow-hidden'>
+        <div className='flex flex-col items-start p-3 gap-2 w-full min-h-[166px] bg-white border border-black/10 rounded-xl overflow-hidden'>
           <h5 className='font-semibold text-base leading-[100%] tracking-[-0.04em] text-[#1D115A]'>
             Evaluasi Guru
           </h5>
@@ -472,7 +472,7 @@ export default function StatistikGuru() {
         {/* 1. Guru Terbaik */}
         <div>
           <h2
-            className='w-[1076px] h-[29px] font-semibold text-2xl leading-[5px] tracking-[-0.07em] mb-6'
+            className='w-full font-semibold text-xl md:text-2xl tracking-[-0.07em] mb-6'
             style={{
               background: 'linear-gradient(180deg, #000000 0%, #0041C9 100%)',
               WebkitBackgroundClip: 'text',
@@ -482,7 +482,7 @@ export default function StatistikGuru() {
           >
             Guru Terbaik
           </h2>
-          <div className='flex flex-wrap gap-[35px] items-start'>
+          <div className='grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6 md:gap-[35px] items-start'>
             {bestTeachers.map((t, i) => (
               <PerformanceCard key={i} teacher={t} type='good' />
             ))}
@@ -492,7 +492,7 @@ export default function StatistikGuru() {
         {/* 2. Butuh Evaluasi */}
         <div>
           <h2
-            className='w-[1076px] h-[29px] font-semibold text-2xl leading-[29px] tracking-[-0.07em] mb-6'
+            className='w-full font-semibold text-xl md:text-2xl tracking-[-0.07em] mb-6'
             style={{
               background: 'linear-gradient(180deg, #000000 0%, #0041C9 100%)',
               WebkitBackgroundClip: 'text',
@@ -502,7 +502,7 @@ export default function StatistikGuru() {
           >
             Butuh Evaluasi
           </h2>
-          <div className='flex flex-wrap gap-[35px] items-start'>
+          <div className='grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6 md:gap-[35px] items-start'>
             {badTeachers.map((t, i) => (
               <PerformanceCard key={i} teacher={t} type='bad' />
             ))}

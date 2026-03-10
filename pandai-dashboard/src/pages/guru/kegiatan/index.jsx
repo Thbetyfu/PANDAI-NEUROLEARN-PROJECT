@@ -162,19 +162,19 @@ export default function KegiatanGuru() {
                         </div>
 
                         {/* 2. Smart Reminder Banner */}
-                        <div className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-200/50 rounded-[20px] p-6 flex items-center justify-between shadow-sm shadow-orange-100/20">
-                            <div className="flex items-center gap-6">
-                                <div className="w-14 h-14 bg-orange-400 rounded-[18px] flex items-center justify-center text-white shadow-lg shadow-orange-200">
+                        <div className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-200/50 rounded-[20px] p-6 flex flex-col md:flex-row items-center justify-between shadow-sm shadow-orange-100/20 gap-6">
+                            <div className="flex items-center gap-4 md:gap-6">
+                                <div className="w-12 h-12 md:w-14 md:h-14 bg-orange-400 rounded-[18px] flex items-center justify-center text-white shadow-lg shadow-orange-200 shrink-0">
                                     <Clock size={28} strokeWidth={2.5} />
                                 </div>
-                                <div>
-                                    <h4 className="text-lg font-bold text-orange-800 mb-1 leading-none">Smart Reminder</h4>
+                                <div className="flex flex-col gap-1">
+                                    <h4 className="text-lg font-bold text-orange-800 leading-none">Smart Reminder</h4>
                                     <p className="text-orange-700/80 text-sm max-w-xl leading-snug">
                                         Pemeriksaan Tugas <span className="font-bold">"Trigonometri Dasar"</span> akan berakhir dalam 2 jam. 12 siswa belum dinilai.
                                     </p>
                                 </div>
                             </div>
-                            <button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold text-sm transition-all shadow-md shadow-orange-200 active:scale-95">
+                            <button className="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold text-sm transition-all shadow-md shadow-orange-200 active:scale-95">
                                 Periksa Sekarang
                             </button>
                         </div>
@@ -230,10 +230,10 @@ export default function KegiatanGuru() {
                                     <Info size={18} className="text-slate-400 cursor-pointer" />
                                 </div>
 
-                                <div className="flex justify-between items-center px-10 py-6">
+                                <div className="flex justify-between items-center px-4 md:px-10 py-6 overflow-x-auto">
                                     {['Sen', 'Sel', 'Rab', 'Kam', 'Jum'].map((day) => (
                                         <span key={day} className={cn(
-                                            "text-[12px] font-bold uppercase font-sans tracking-wider",
+                                            "text-[12px] font-bold uppercase font-sans tracking-wider shrink-0",
                                             day === 'Rab' ? "text-[#EF4444]" : "text-slate-400"
                                         )}>
                                             {day}
@@ -258,7 +258,7 @@ export default function KegiatanGuru() {
                         {/* 1. Mata Pelajaran Diampu */}
                         <div>
                             <h3 className="text-lg font-bold text-slate-800 mb-4">Mata Pelajaran Diampu</h3>
-                            <div className="flex flex-col gap-4">
+                            <div className="grid grid-cols-2 lg:flex lg:flex-col gap-4">
                                 {subjects.map((s) => (
                                     <div key={s.id} className="bg-white rounded-[24px] p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-center gap-4">
                                         <div className={cn("w-16 h-16 rounded-[22px] flex items-center justify-center transition-transform group-hover:scale-110", s.bg, s.color)}>

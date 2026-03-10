@@ -62,8 +62,8 @@ export default function ProfilAnak() {
         </h1>
 
         {/* 1. Profile Header Card */}
-        <div className='bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-6'>
-          <div className='w-20 h-20 rounded-full bg-pink-100 overflow-hidden border-2 border-white shadow-sm'>
+        <div className='bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left'>
+          <div className='w-20 h-20 rounded-full bg-pink-100 overflow-hidden border-2 border-white shadow-sm shrink-0'>
             {/* Gunakan placeholder yang sama dengan desain */}
             <img
               src='https://api.dicebear.com/7.x/avataaars/svg?seed=Fanan'
@@ -72,7 +72,7 @@ export default function ProfilAnak() {
             />
           </div>
           <div>
-            <h2 className='text-2xl font-bold text-slate-800'>
+            <h2 className='text-2xl font-bold text-slate-800 tracking-tight'>
               Fanan Agfian Mozart
             </h2>
             <p className='text-slate-500 font-medium'>Murid Kelas XII Mipa 6</p>
@@ -145,7 +145,7 @@ export default function ProfilAnak() {
 
           {/* Action Button */}
           <div className='mt-10'>
-            <button className='bg-[#6366F1] hover:bg-[#4F46E5] text-white font-bold py-3 px-8 rounded-full shadow-md shadow-indigo-200 transition-all active:scale-95'>
+            <button className='w-full sm:w-auto bg-[#6366F1] hover:bg-[#4F46E5] text-white font-bold py-3 px-12 rounded-full shadow-md shadow-indigo-200 transition-all active:scale-95'>
               Ajukan perubahan
             </button>
           </div>

@@ -39,15 +39,15 @@ const StatCard = ({ label, value, icon: Icon }) => (
 // 2. Component Teacher Card (Kartu Guru) - Premium Gradient Design
 const TeacherCard = ({ teacher }) => (
   <div
-    className='flex flex-col items-start p-6 gap-[21px] w-[200px] h-[334px] rounded-[24px] border border-black/20'
+    className='flex flex-col items-start p-6 gap-[21px] w-full min-h-[334px] rounded-[24px] border border-black/20'
     style={{
       background: 'linear-gradient(180deg, #FFFFFF 50%, #E9F2FB 100%)'
     }}
   >
     {/* Profile & Name Section */}
-    <div className='flex flex-col items-start gap-[18px] w-[152px]'>
+    <div className='flex flex-col items-start gap-[18px] w-full'>
       {/* Profile Image */}
-      <div className='w-20 h-20 rounded-full overflow-hidden'>
+      <div className='w-20 h-20 rounded-full overflow-hidden shrink-0'>
         <img
           src={teacher.image}
           alt={teacher.name}
@@ -58,7 +58,7 @@ const TeacherCard = ({ teacher }) => (
       {/* Name & NIP */}
       <div className='flex flex-col items-start gap-[7px] w-full'>
         <h4
-          className='w-full h-6 font-semibold text-2xl leading-[100%] text-center tracking-[-0.06em]'
+          className='w-full font-semibold text-xl md:text-2xl leading-[100%] tracking-[-0.06em]'
           style={{
             background: 'linear-gradient(180deg, #000000 4.61%, #000000 100%)',
             WebkitBackgroundClip: 'text',
@@ -69,7 +69,7 @@ const TeacherCard = ({ teacher }) => (
           {teacher.name}
         </h4>
         <p
-          className='w-full h-[14px] font-medium text-sm leading-[100%] tracking-[-0.06em]'
+          className='w-full font-medium text-sm leading-[100%] tracking-[-0.06em]'
           style={{
             background: 'linear-gradient(180deg, #000000 4.61%, #000000 100%)',
             WebkitBackgroundClip: 'text',
@@ -83,9 +83,9 @@ const TeacherCard = ({ teacher }) => (
     </div>
 
     {/* Mapel Diampu Section */}
-    <div className='flex flex-col items-start gap-[7px] w-[152px]'>
+    <div className='flex flex-col items-start gap-[7px] w-full'>
       <p
-        className='w-full h-[14px] font-medium text-sm leading-[100%] tracking-[-0.06em]'
+        className='w-full font-medium text-sm leading-[100%] tracking-[-0.06em]'
         style={{
           background: 'linear-gradient(180deg, #000000 4.61%, #000000 100%)',
           WebkitBackgroundClip: 'text',
@@ -96,19 +96,19 @@ const TeacherCard = ({ teacher }) => (
         Mapel Diampu
       </p>
       <div className='flex flex-row flex-wrap items-center gap-x-1 gap-y-2 w-full'>
-        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
+        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-[10px] md:text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
           {teacher.mapel}
         </span>
-        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
+        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-[10px] md:text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
           {teacher.kelas}
         </span>
       </div>
     </div>
 
     {/* Wali Kelas Section */}
-    <div className='flex flex-col items-start gap-[7px] w-[152px]'>
+    <div className='flex flex-col items-start gap-[7px] w-full'>
       <p
-        className='w-full h-[14px] font-medium text-sm leading-[100%] tracking-[-0.06em]'
+        className='w-full font-medium text-sm leading-[100%] tracking-[-0.06em]'
         style={{
           background: 'linear-gradient(180deg, #000000 4.61%, #000000 100%)',
           WebkitBackgroundClip: 'text',
@@ -119,7 +119,7 @@ const TeacherCard = ({ teacher }) => (
         Wali kelas
       </p>
       <div className='flex flex-row flex-wrap items-center gap-x-1 gap-y-2 w-full'>
-        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
+        <span className='flex items-center justify-center px-2 py-[1px] bg-black/[0.02] border border-black/10 rounded-full text-[10px] md:text-xs font-medium leading-[15px] tracking-[-0.02em] text-[#37364E]'>
           {teacher.waliKelas}
         </span>
       </div>
@@ -136,25 +136,25 @@ export default function DashboardWaka() {
         <title>Dashboard Waka - Pandai</title>
       </Head>
 
-      <div className='flex flex-col gap-8 max-w-[1400px]'>
+      <div className='flex flex-col gap-8 max-[1400px] w-full'>
         {/* Header Title */}
-        <h1 className='text-2xl font-bold text-slate-800'>Dashboard WAKA</h1>
+        <h1 className='text-xl md:text-2xl font-bold text-slate-800'>Dashboard WAKA</h1>
 
         {/* 1. Stats Section */}
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'>
           {stats.map((stat, idx) => (
             <StatCard key={idx} {...stat} />
           ))}
         </div>
 
         {/* 2. Daftar Guru Section */}
-        <div>
-          <h2 className="w-[1076px] h-[29px] font-medium text-[24px] leading-[29px] tracking-[-0.07em] text-black flex-none order-0 self-stretch grow-0 mb-6">
+        <div className="w-full">
+          <h2 className="font-medium text-xl md:text-2xl tracking-[-0.07em] text-black mb-6">
             Daftar Sekilas Guru
           </h2>
 
           {/* Grid Layout untuk Kartu Guru */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6'>
             {teachers.map((t, i) => (
               <TeacherCard key={i} teacher={t} />
             ))}

@@ -272,107 +272,109 @@ export default function EvaluasiGuru() {
                 </div>
               </div>
 
-              {/* Table */}
-              <div className='flex flex-col gap-2.5'>
-                {/* Header Row */}
-                <div className='flex items-center justify-between px-5 py-2.5 bg-[#E8F1FB] border border-[rgba(102,102,102,0.14)] rounded-[5px]'>
-                  <div className='w-8 text-center'>
-                    <span className='font-medium text-[15px] text-black tracking-tight'>No</span>
-                  </div>
-                  <div className='flex-1'>
-                    <span className='font-medium text-[15px] text-black tracking-tight'>Nama</span>
-                  </div>
-                  <div className='w-32'>
-                    <span className='font-medium text-[15px] text-black tracking-tight'>Materi</span>
-                  </div>
-                  <div className='w-40 text-center'>
-                    <span className='font-medium text-[15px] text-black tracking-tight'>Stress-Relax</span>
-                  </div>
-                  <div className='w-20 text-center'>
-                    <span className='font-medium text-[15px] text-black tracking-tight'>Skor Quiz</span>
-                  </div>
-                </div>
-
-                {/* Data Rows */}
-                <div className='flex flex-col gap-6 py-2.5 px-5 rounded-xl'>
-                  {/* Row 1 - Stress */}
-                  <div className='flex items-center justify-between'>
+              {/* Table wrapper for horizontal scroll on mobile */}
+              <div className='overflow-x-auto'>
+                <div className='min-w-[650px] flex flex-col gap-2.5'>
+                  {/* Header Row */}
+                  <div className='flex items-center justify-between px-5 py-2.5 bg-[#E8F1FB] border border-[rgba(102,102,102,0.14)] rounded-[5px]'>
                     <div className='w-8 text-center'>
-                      <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>1.</span>
+                      <span className='font-medium text-[15px] text-black tracking-tight'>No</span>
                     </div>
                     <div className='flex-1'>
-                      <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Fanan Agfian Mozart</span>
+                      <span className='font-medium text-[15px] text-black tracking-tight'>Nama</span>
                     </div>
                     <div className='w-32'>
-                      <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
+                      <span className='font-medium text-[15px] text-black tracking-tight'>Materi</span>
                     </div>
-                    <div className='w-40 flex items-center justify-center gap-2'>
-                      {/* Stress Indicator - 2/5 dots filled (Red) */}
-                      <div className='flex items-center gap-1'>
-                        <div className='w-1.5 h-4 bg-[#F87171] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#F87171] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
-                      </div>
-                      <span className='font-bold text-[10px] text-[#EF4444] uppercase tracking-wide'>Stress</span>
+                    <div className='w-40 text-center'>
+                      <span className='font-medium text-[15px] text-black tracking-tight'>Stress-Relax</span>
                     </div>
                     <div className='w-20 text-center'>
-                      <span className='font-medium text-sm text-[#F26767] tracking-tight'>45</span>
+                      <span className='font-medium text-[15px] text-black tracking-tight'>Skor Quiz</span>
                     </div>
                   </div>
 
-                  {/* Row 2 - Neutral */}
-                  <div className='flex items-center justify-between'>
-                    <div className='w-8 text-center'>
-                      <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>2.</span>
-                    </div>
-                    <div className='flex-1'>
-                      <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Jossephine Angela</span>
-                    </div>
-                    <div className='w-32'>
-                      <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
-                    </div>
-                    <div className='w-40 flex items-center justify-center gap-2'>
-                      {/* Neutral Indicator - 3/5 dots filled (Yellow) */}
-                      <div className='flex items-center gap-1'>
-                        <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                  {/* Data Rows */}
+                  <div className='flex flex-col gap-6 py-2.5 px-5 rounded-xl'>
+                    {/* Row 1 - Stress */}
+                    <div className='flex items-center justify-between'>
+                      <div className='w-8 text-center'>
+                        <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>1.</span>
                       </div>
-                      <span className='font-bold text-[10px] text-[#EAB308] uppercase tracking-wide'>Neutral</span>
+                      <div className='flex-1'>
+                        <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Fanan Agfian Mozart</span>
+                      </div>
+                      <div className='w-32'>
+                        <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
+                      </div>
+                      <div className='w-40 flex items-center justify-center gap-2'>
+                        {/* Stress Indicator - 2/5 dots filled (Red) */}
+                        <div className='flex items-center gap-1'>
+                          <div className='w-1.5 h-4 bg-[#F87171] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#F87171] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                        </div>
+                        <span className='font-bold text-[10px] text-[#EF4444] uppercase tracking-wide'>Stress</span>
+                      </div>
+                      <div className='w-20 text-center'>
+                        <span className='font-medium text-sm text-[#F26767] tracking-tight'>45</span>
+                      </div>
                     </div>
-                    <div className='w-20 text-center'>
-                      <span className='font-medium text-sm text-[#EAB308] tracking-tight'>50</span>
-                    </div>
-                  </div>
 
-                  {/* Row 3 - Relax */}
-                  <div className='flex items-center justify-between'>
-                    <div className='w-8 text-center'>
-                      <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>3.</span>
-                    </div>
-                    <div className='flex-1'>
-                      <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Raphael Cameron</span>
-                    </div>
-                    <div className='w-32'>
-                      <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
-                    </div>
-                    <div className='w-40 flex items-center justify-center gap-2'>
-                      {/* Relax Indicator - 5/5 dots filled (Green) */}
-                      <div className='flex items-center gap-1'>
-                        <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
-                        <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                    {/* Row 2 - Neutral */}
+                    <div className='flex items-center justify-between'>
+                      <div className='w-8 text-center'>
+                        <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>2.</span>
                       </div>
-                      <span className='font-bold text-[10px] text-[#4ADE80] uppercase tracking-wide'>Relax</span>
+                      <div className='flex-1'>
+                        <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Jossephine Angela</span>
+                      </div>
+                      <div className='w-32'>
+                        <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
+                      </div>
+                      <div className='w-40 flex items-center justify-center gap-2'>
+                        {/* Neutral Indicator - 3/5 dots filled (Yellow) */}
+                        <div className='flex items-center gap-1'>
+                          <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#FACC15] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#E2E8F0] rounded-full'></div>
+                        </div>
+                        <span className='font-bold text-[10px] text-[#EAB308] uppercase tracking-wide'>Neutral</span>
+                      </div>
+                      <div className='w-20 text-center'>
+                        <span className='font-medium text-sm text-[#EAB308] tracking-tight'>50</span>
+                      </div>
                     </div>
-                    <div className='w-20 text-center'>
-                      <span className='font-medium text-sm text-[#F87171] tracking-tight'>20</span>
+
+                    {/* Row 3 - Relax */}
+                    <div className='flex items-center justify-between'>
+                      <div className='w-8 text-center'>
+                        <span className='font-semibold text-sm text-[#0041C9] tracking-tight'>3.</span>
+                      </div>
+                      <div className='flex-1'>
+                        <span className='font-semibold text-sm text-[#1D115A] tracking-tight'>Raphael Cameron</span>
+                      </div>
+                      <div className='w-32'>
+                        <span className='font-normal text-sm text-[#1D115A] tracking-tight'>Bab 1 - Aljabar I</span>
+                      </div>
+                      <div className='w-40 flex items-center justify-center gap-2'>
+                        {/* Relax Indicator - 5/5 dots filled (Green) */}
+                        <div className='flex items-center gap-1'>
+                          <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                          <div className='w-1.5 h-4 bg-[#4ADE80] rounded-full'></div>
+                        </div>
+                        <span className='font-bold text-[10px] text-[#4ADE80] uppercase tracking-wide'>Relax</span>
+                      </div>
+                      <div className='w-20 text-center'>
+                        <span className='font-medium text-sm text-[#F87171] tracking-tight'>20</span>
+                      </div>
                     </div>
                   </div>
                 </div>

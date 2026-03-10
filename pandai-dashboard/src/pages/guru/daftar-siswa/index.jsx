@@ -133,7 +133,7 @@ export default function DaftarSiswaGuru() {
                       setSearchQuery('');
                     }}
                     className={cn(
-                      "px-5 py-2 rounded-full text-[14px] font-semibold transition-all duration-300 transform active:scale-95",
+                      "px-5 py-2 rounded-full text-[14px] font-semibold transition-all duration-300 transform active:scale-95 whitespace-nowrap",
                       selectedClass === cls
                         ? "bg-[#0052CC] text-white shadow-lg shadow-blue-200"
                         : "bg-white text-[#475569] border border-[#E2E8F0] hover:bg-slate-50"
@@ -166,7 +166,7 @@ export default function DaftarSiswaGuru() {
                     className="w-full bg-[#F8FAFC] border-none rounded-[12px] py-3 pl-12 pr-4 text-[14px] selection:bg-blue-100 focus:ring-2 focus:ring-blue-50 placeholder-[#6B7280] font-sans transition-all"
                   />
                 </div>
-                <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[12px] text-[14px] font-bold text-[#334155] hover:bg-slate-50 transition-colors w-full md:w-auto">
+                <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-[#E2E8F0] rounded-[12px] text-[14px] font-bold text-[#334155] hover:bg-slate-50 transition-colors w-full md:w-auto shrink-0 shadow-sm">
                   <Filter size={16} /> Urutkan
                 </button>
               </div>

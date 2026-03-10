@@ -61,7 +61,7 @@ const ClassAccordion = ({ classNameString, isOpen, onClick }) => {
 
               <div className='flex flex-col md:flex-row gap-6'>
                 {/* Chart Peningkatan */}
-                <div className='flex-1 flex items-center gap-4 border-r border-gray-50 pr-4'>
+                <div className='flex-1 flex items-center gap-4 border-b md:border-b-0 md:border-r border-gray-50 pb-4 md:pb-0 md:pr-4'>
                   <div className='relative w-16 h-16'>
                     <svg
                       className='w-full h-full transform -rotate-90'
