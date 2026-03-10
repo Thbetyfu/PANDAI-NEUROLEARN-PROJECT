@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
@@ -16,21 +16,45 @@ import {
 import { cn } from '@/lib/utils';
 
 // --- DUMMY DATA ---
-const studentsList = [
-  { id: 1, name: 'Fanan Agfian Mozart', nis: '2109845', score: 88.5, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Fanan' },
-  { id: 2, name: 'Aris Setiawan', nis: '2109846', score: 76.2, status: 'PERLU BIMBINGAN', statusColor: 'text-[#A16207] bg-[#FEFCE8]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aris' },
-  { id: 3, name: 'Citra Lestari', nis: '2109847', score: 92.0, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Citra' },
-  { id: 4, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni' },
-  // Repeated to match mockup
-  { id: 5, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni2' },
-  { id: 6, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni3' },
-  { id: 7, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni4' },
-  { id: 8, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni5' },
-  { id: 9, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni6' },
-  { id: 10, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni7' },
-];
+const studentsByClass = {
+  'XII MIPA 6': [
+    { id: 1, name: 'Fanan Agfian Mozart', nis: '2109845', score: 88.5, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Fanan' },
+    { id: 2, name: 'Aris Setiawan', nis: '2109846', score: 76.2, status: 'PERLU BIMBINGAN', statusColor: 'text-[#A16207] bg-[#FEFCE8]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aris' },
+    { id: 3, name: 'Citra Lestari', nis: '2109847', score: 92.0, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Citra' },
+    { id: 4, name: 'Deni Pratama', nis: '2109848', score: 81.4, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Deni' },
+    { id: 5, name: 'Eka Putri', nis: '2109849', score: 85.0, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Eka' },
+  ],
+  'XII MIPA 5': [
+    { id: 11, name: 'Budi Santoso', nis: '2109901', score: 72.5, status: 'PERLU BIMBINGAN', statusColor: 'text-[#A16207] bg-[#FEFCE8]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Budi' },
+    { id: 12, name: 'Dewi Lestari', nis: '2109902', score: 95.0, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dewi' },
+    { id: 13, name: 'Gilang Ramadhan', nis: '2109903', score: 80.0, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Gilang' },
+    { id: 14, name: 'Hesti Purwanti', nis: '2109904', score: 88.2, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hesti' },
+  ],
+  'XII MIPA 4': [
+    { id: 21, name: 'Indra Wijaya', nis: '2109801', score: 65.4, status: 'PERLU BIMBINGAN', statusColor: 'text-[#A16207] bg-[#FEFCE8]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Indra' },
+    { id: 22, name: 'Julia Perez', nis: '2109802', score: 91.2, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Julia' },
+    { id: 23, name: 'Kevin Sanjaya', nis: '2109803', score: 84.5, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
+  ],
+  'XII MIPA 3': [
+    { id: 31, name: 'Lani Marlina', nis: '2109701', score: 78.9, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lani' },
+    { id: 32, name: 'Maman Abdurrahman', nis: '2109702', score: 82.1, status: 'STABIL', statusColor: 'text-[#1D4ED8] bg-[#EFF6FF]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maman' },
+  ],
+  'XI MIPA 1': [
+    { id: 41, name: 'Nina Zatulini', nis: '2209001', score: 96.5, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Nina' },
+    { id: 42, name: 'Oky Lukman', nis: '2209002', score: 74.3, status: 'PERLU BIMBINGAN', statusColor: 'text-[#A16207] bg-[#FEFCE8]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Oky' },
+    { id: 43, name: 'Putri Marino', nis: '2209003', score: 89.0, status: 'SANGAT BAIK', statusColor: 'text-[#15803D] bg-[#F0FDF4]', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Putri' },
+  ],
+};
 
-const classes = ['XII MIPA 6', 'XII MIPA 5', 'XII MIPA 4', 'XII MIPA 3', 'XI MIPA 1'];
+const classStats = {
+  'XII MIPA 6': { total: 36, attendance: '98%', trend: '↑ 2%', score: '82.4' },
+  'XII MIPA 5': { total: 32, attendance: '95%', trend: '↑ 1%', score: '84.1' },
+  'XII MIPA 4': { total: 35, attendance: '92%', trend: '↓ 1%', score: '79.8' },
+  'XII MIPA 3': { total: 34, attendance: '97%', trend: '↑ 3%', score: '81.5' },
+  'XI MIPA 1': { total: 38, attendance: '99%', trend: '↑ 1%', score: '88.3' },
+};
+
+const classes = Object.keys(studentsByClass);
 
 const tasksData = [
   { id: 1, title: 'Matematika Wajib Pos Test', date: '16 November 2022' },
@@ -43,7 +67,7 @@ const tasksData = [
 const StatCard = ({ icon: Icon, label, value, unit, trend, iconBg, iconColor }) => (
   <div className="bg-white rounded-[16px] border border-[#E2E8F0] shadow-sm p-5 flex items-center justify-between flex-1">
     <div className="flex items-center gap-4">
-      <div className={cn("w-12 h-12 rounded-[12px] flex items-center justify-center", iconBg, iconColor)}>
+      <div className={cn("w-12 h-12 rounded-[12px] flex items-center justify-center transition-all duration-300", iconBg, iconColor)}>
         <Icon size={24} />
       </div>
       <div>
@@ -51,7 +75,14 @@ const StatCard = ({ icon: Icon, label, value, unit, trend, iconBg, iconColor }) 
         <div className="flex items-baseline gap-1 mt-0.5">
           <span className="text-[24px] font-bold text-[#0F172A]">{value}</span>
           {unit && <span className="text-[14px] text-[#94A3B8] ml-1">{unit}</span>}
-          {trend && <span className="text-[14px] font-medium text-[#22C55E] ml-2">{trend}</span>}
+          {trend && (
+            <span className={cn(
+              "text-[14px] font-medium ml-2",
+              trend.includes('↑') ? "text-[#22C55E]" : "text-[#EF4444]"
+            )}>
+              {trend}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -60,6 +91,19 @@ const StatCard = ({ icon: Icon, label, value, unit, trend, iconBg, iconColor }) 
 
 export default function DaftarSiswaGuru() {
   const [selectedClass, setSelectedClass] = useState('XII MIPA 6');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Get current class data
+  const currentStudents = useMemo(() => {
+    const list = studentsByClass[selectedClass] || [];
+    if (!searchQuery) return list;
+    return list.filter(s =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.nis.includes(searchQuery)
+    );
+  }, [selectedClass, searchQuery]);
+
+  const stats = useMemo(() => classStats[selectedClass] || classStats['XII MIPA 6'], [selectedClass]);
 
   return (
     <DashboardLayout role='guru'>
@@ -84,9 +128,12 @@ export default function DaftarSiswaGuru() {
                 {classes.map((cls) => (
                   <button
                     key={cls}
-                    onClick={() => setSelectedClass(cls)}
+                    onClick={() => {
+                      setSelectedClass(cls);
+                      setSearchQuery('');
+                    }}
                     className={cn(
-                      "px-5 py-2 rounded-full text-[14px] font-semibold transition-all duration-200",
+                      "px-5 py-2 rounded-full text-[14px] font-semibold transition-all duration-300 transform active:scale-95",
                       selectedClass === cls
                         ? "bg-[#0052CC] text-white shadow-lg shadow-blue-200"
                         : "bg-white text-[#475569] border border-[#E2E8F0] hover:bg-slate-50"
@@ -100,21 +147,23 @@ export default function DaftarSiswaGuru() {
 
             {/* Summary Stat Cards */}
             <div className="flex flex-col md:flex-row gap-4">
-              <StatCard icon={Users} label="TOTAL SISWA" value="36" unit="Siswa" iconBg="bg-[#EFF6FF]" iconColor="text-[#0052CC]" />
-              <StatCard icon={CheckCircle} label="KEHADIRAN HARI INI" value="98%" trend="↑ 2%" iconBg="bg-[#F0FDF4]" iconColor="text-[#16A34A]" />
-              <StatCard icon={Brain} label="SKOR KOGNITIF" value="82.4" unit="Avg" iconBg="bg-[#FFF7ED]" iconColor="text-[#EA580C]" />
+              <StatCard icon={Users} label="TOTAL SISWA" value={stats.total} unit="Siswa" iconBg="bg-[#EFF6FF]" iconColor="text-[#0052CC]" />
+              <StatCard icon={CheckCircle} label="KEHADIRAN HARI INI" value={stats.attendance} trend={stats.trend} iconBg="bg-[#F0FDF4]" iconColor="text-[#16A34A]" />
+              <StatCard icon={Brain} label="SKOR KOGNITIF" value={stats.score} unit="Avg" iconBg="bg-[#FFF7ED]" iconColor="text-[#EA580C]" />
             </div>
 
             {/* Main Table Card */}
-            <div className="bg-white rounded-[16px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+            <div className="bg-white rounded-[16px] border border-[#E2E8F0] shadow-sm overflow-hidden min-h-[500px]">
               {/* Table Toolbar */}
               <div className="p-5 border-b border-[#F1F5F9] flex flex-col md:flex-row gap-4 justify-between items-center">
                 <div className="relative w-full max-w-md">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={18} />
                   <input
                     type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari nama siswa..."
-                    className="w-full bg-[#F8FAFC] border-none rounded-[12px] py-3 pl-12 pr-4 text-[14px] selection:bg-blue-100 focus:ring-1 focus:ring-blue-100 placeholder-[#6B7280] font-sans"
+                    className="w-full bg-[#F8FAFC] border-none rounded-[12px] py-3 pl-12 pr-4 text-[14px] selection:bg-blue-100 focus:ring-2 focus:ring-blue-50 placeholder-[#6B7280] font-sans transition-all"
                   />
                 </div>
                 <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[12px] text-[14px] font-bold text-[#334155] hover:bg-slate-50 transition-colors w-full md:w-auto">
@@ -134,52 +183,60 @@ export default function DaftarSiswaGuru() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {studentsList.map(student => (
-                      <tr key={student.id} className="hover:bg-slate-50/80 transition-colors group">
-                        {/* Student Info */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <img src={student.img} alt={student.name} className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200" />
-                            <div>
-                              <div className="text-[14px] font-bold text-[#0F172A] font-sans">{student.name}</div>
-                              <div className="text-[10px] text-[#64748B] font-sans uppercase">NIS: {student.nis}</div>
+                    {currentStudents.length > 0 ? (
+                      currentStudents.map(student => (
+                        <tr key={student.id} className="hover:bg-slate-50/80 transition-colors group animate-in fade-in slide-in-from-left-2 duration-300">
+                          {/* Student Info */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <img src={student.img} alt={student.name} className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200" />
+                              <div>
+                                <div className="text-[14px] font-bold text-[#0F172A] font-sans">{student.name}</div>
+                                <div className="text-[10px] text-[#64748B] font-sans uppercase">NIS: {student.nis}</div>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        {/* Score with Progress Bar */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-3 min-w-[120px]">
-                            <span className="text-[14px] font-bold text-[#334155] font-sans">{student.score}</span>
-                            <div className="w-20 h-1.5 bg-[#F1F5F9] rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#0052CC] rounded-full"
-                                style={{ width: `${student.score}%` }}
-                              />
+                          </td>
+                          {/* Score with Progress Bar */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-3 min-w-[120px]">
+                              <span className="text-[14px] font-bold text-[#334155] font-sans">{student.score}</span>
+                              <div className="w-20 h-1.5 bg-[#F1F5F9] rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-[#0052CC] rounded-full transition-all duration-700 ease-out"
+                                  style={{ width: `${student.score}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        {/* Status Badge */}
-                        <td className="px-6 py-4 text-center">
-                          <span className={cn(
-                            "inline-block px-3 py-1 rounded-[8px] text-[11px] font-bold uppercase tracking-tight font-sans",
-                            student.statusColor
-                          )}>
-                            {student.status}
-                          </span>
-                        </td>
-                        {/* Actions */}
-                        <td className="px-6 py-4 text-right text-[#94A3B8]">
-                          <div className="flex items-center justify-end gap-2">
-                            <button className="p-2 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-lg transition-all">
-                              <Eye size={18} />
-                            </button>
-                            <button className="p-2 hover:bg-white hover:text-slate-600 hover:shadow-sm rounded-lg transition-all">
-                              <MoreVertical size={18} />
-                            </button>
-                          </div>
+                          </td>
+                          {/* Status Badge */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={cn(
+                              "inline-block px-3 py-1 rounded-[8px] text-[11px] font-bold uppercase tracking-tight font-sans transition-colors duration-300",
+                              student.statusColor
+                            )}>
+                              {student.status}
+                            </span>
+                          </td>
+                          {/* Actions */}
+                          <td className="px-6 py-4 text-right text-[#94A3B8]">
+                            <div className="flex items-center justify-end gap-2">
+                              <button className="p-2 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-lg transition-all">
+                                <Eye size={18} />
+                              </button>
+                              <button className="p-2 hover:bg-white hover:text-slate-600 hover:shadow-sm rounded-lg transition-all">
+                                <MoreVertical size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-20 text-center text-slate-400 font-sans">
+                          Tidak ada data siswa ditemukan...
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
