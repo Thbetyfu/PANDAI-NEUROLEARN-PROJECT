@@ -124,7 +124,18 @@ Menjadi motor penggerak transformasi pendidikan nasional yang melampaui limitasi
 
 ---
 
-## 📜 7. Lisensi Koder & Hak Cipta
+## 📂 7. Struktur Folder
+
+Repositori ini diatur dengan struktur yang modular untuk memudahkan pengembangan dan dokumentasi:
+
+*   **`pandai-dashboard/`**: Dashboard monitoring berbasis web yang ditujukan untuk **Guru, Waka (Wakil Kepala Sekolah), dan Orang Tua**. Dashboard ini berfungsi untuk visualisasi data biometrik, analisis kognitif makro, dan pengelolaan intervensi.
+*   **`Siswa/`**: Folder pusat yang berisi seluruh aplikasi yang berinteraksi langsung dengan siswa:
+    *   **`Neuro-Client-Siswa/`**: Aplikasi berbasis Desktop (Python/Tkinter) yang berfungsi sebagai pengendali *hardware* biometrik, sensor *eye-tracking*, dan modul stimulasi tDCS dengan latensi minimal.
+    *   **`Pandai -LMS-Siswa/`**: *Learning Management System* berbasis Web yang digunakan siswa untuk mengakses materi pembelajaran dan melakukan dialektika dengan AI personal.
+
+---
+
+## 👤 8. Orang di balik project ini
 
 © 2026 PANDAI PROJECT. All Rights Reserved.  
 **Lead Developer/Architect**:  
