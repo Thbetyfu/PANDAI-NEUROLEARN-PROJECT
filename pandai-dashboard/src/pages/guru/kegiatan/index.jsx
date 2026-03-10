@@ -11,7 +11,8 @@ import {
     Clock,
     Bell,
     ArrowRight,
-    ClipboardList
+    ClipboardList,
+    Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -209,6 +210,35 @@ export default function KegiatanGuru() {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+
+                            {/* 4. Beban Kerja Siswa (Avg) */}
+                            <div className="bg-white rounded-[12px] border border-[#E2E8F0] shadow-sm p-6 mt-8 flex flex-col gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h2 className="text-[15px] font-bold text-slate-800 font-sans">Beban Kerja Siswa (Avg)</h2>
+                                        <p className="text-[11px] text-slate-400 mt-1 font-sans">Total tugas dari semua Mapel minggu ini</p>
+                                    </div>
+                                    <Info size={18} className="text-slate-400 cursor-pointer" />
+                                </div>
+
+                                <div className="flex justify-between items-center px-10 py-6">
+                                    {['Sen', 'Sel', 'Rab', 'Kam', 'Jum'].map((day) => (
+                                        <span key={day} className={cn(
+                                            "text-[12px] font-bold uppercase font-sans tracking-wider",
+                                            day === 'Rab' ? "text-[#EF4444]" : "text-slate-400"
+                                        )}>
+                                            {day}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                <div className="bg-[#FEF2F2] rounded-lg p-4">
+                                    <p className="text-[11px] text-[#DC2626] leading-snug font-sans">
+                                        <span className="font-bold mr-1 uppercase">Saran:</span>
+                                        Hari Rabu memiliki beban kerja tinggi (9 tugas deadline). Hindari membuat tugas baru dengan tenggat hari tersebut.
+                                    </p>
                                 </div>
                             </div>
                         </div>
