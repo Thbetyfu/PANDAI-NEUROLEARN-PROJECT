@@ -15,6 +15,8 @@ import {
     Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import BuatTugasModal from '@/components/guru/BuatTugasModal';
+
 
 // --- DUMMY DATA ---
 const scheduleDays = [
@@ -69,6 +71,8 @@ const activeTasks = [
 ];
 
 export default function KegiatanGuru() {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     return (
         <DashboardLayout role="guru">
             <Head>
@@ -182,7 +186,10 @@ export default function KegiatanGuru() {
                                 <h2 className="text-xl font-bold text-slate-800">Pusat Tugas & Asesmen</h2>
                             </div>
 
-                            <button className="w-full bg-[#3D25FF] hover:bg-[#321EE0] text-white py-5 rounded-[20px] flex items-center justify-center gap-3 font-bold text-lg shadow-xl shadow-indigo-100 transition-all active:scale-[0.99] mb-6">
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="w-full bg-[#3D25FF] hover:bg-[#321EE0] text-white py-5 rounded-[20px] flex items-center justify-center gap-3 font-bold text-lg shadow-xl shadow-indigo-100 transition-all active:scale-[0.99] mb-6"
+                            >
                                 <div className="w-8 h-8 rounded-full border-2 border-white/30 flex items-center justify-center">
                                     <Plus size={20} strokeWidth={3} />
                                 </div>
@@ -292,6 +299,11 @@ export default function KegiatanGuru() {
 
                 </div>
             </div>
+
+            <BuatTugasModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
         </DashboardLayout>
     );
 }
