@@ -147,7 +147,7 @@ export default function DaftarSiswaGuru() {
 
             {/* Summary Stat Cards */}
             <div className="flex flex-col md:flex-row gap-4">
-              <StatCard icon={Users} label="TOTAL SISWA" value={stats.total} unit="Siswa" iconBg="bg-[#EFF6FF]" iconColor="text-[#0052CC]" />
+              <StatCard icon={Users} label="TOTAL SISWA" value={currentStudents.length} unit="Siswa" iconBg="bg-[#EFF6FF]" iconColor="text-[#0052CC]" />
               <StatCard icon={CheckCircle} label="KEHADIRAN HARI INI" value={stats.attendance} trend={stats.trend} iconBg="bg-[#F0FDF4]" iconColor="text-[#16A34A]" />
               <StatCard icon={Brain} label="SKOR KOGNITIF" value={stats.score} unit="Avg" iconBg="bg-[#FFF7ED]" iconColor="text-[#EA580C]" />
             </div>
