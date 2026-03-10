@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import PandaLogo from '@/components/icons/PandaLogo';
 import PandaiTextLogo from '@/components/icons/PandaiTextLogo';
+import KegiatanIcon from '@/components/icons/KegiatanIcon';
 
 const Sidebar = ({ role, isOpen, onClose }) => {
   const router = useRouter();
@@ -19,6 +20,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
   const menus = {
     guru: [
       { name: 'Home', icon: Home, path: '/guru' },
+      { name: 'Kegiatan', icon: KegiatanIcon, path: '/guru/kegiatan' },
       { name: 'Daftar Siswa', icon: Users, path: '/guru/daftar-siswa' },
       { name: 'Evaluasi', icon: FileText, path: '/guru/evaluasi' },
     ],
