@@ -41,3 +41,11 @@ next-env.d.ts
 # docs and proposals
 "Prposal-PANDA-NEUROLEARN.md"
 "spesifikasi Dashboard.md"
+
+# Antigravity Agents
+.agents/
+.agent/
+
+# Python cache
+__pycache__/
+*.pyc

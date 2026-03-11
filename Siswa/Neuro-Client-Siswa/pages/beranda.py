@@ -1,0 +1,408 @@
+import customtkinter as ctk
+import tkinter as tk
+import random
+import os
+from components.logo import PandaiEmotLogo, load_svg_as_pil
+
+class BerandaPage(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, corner_radius=0, fg_color="transparent", **kwargs)
+        
+        # --- CSS CONSTANTS ---
+        self.CONTENT_WIDTH = 1122
+        self.TEXT_DARK_BLUE = "#001D5A"
+        self.CORNER_RADIUS = 24
+
+        # 1. MAIN SCROLLABLE AREA
+        self.scroll_frame = ctk.CTkScrollableFrame(
+            self, 
+            fg_color="transparent", 
+            corner_radius=0
+        )
+        self.scroll_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+        # Content Inner Wrapper (Liquid Layout)
+        self.inner = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        self.inner.pack(fill="x", pady=(80, 100), padx=(40, 56))
+
+        # --- SECTION 1: HEADER (Hi, Mozart + Logo) ---
+        self.setup_header()
+
+        # --- SECTION 2: STATISTIK ROW ---
+        self.setup_stats_row()
+
+        # --- SECTION 3: BOTTOM GRID ---
+        self.setup_bottom_grid()
+
+    def setup_header(self):
+        # Frame 76035 inside Header
+        header_container = ctk.CTkFrame(self.inner, fg_color="transparent")
+        header_container.pack(fill="x", pady=(0, 32), anchor="w") # Gap to next section: 32px
+
+        # Greeting Row
+        greet_row = ctk.CTkFrame(header_container, fg_color="transparent")
+        greet_row.pack(anchor="w")
+
+        # Hi, Mozart (font-size: 64px, weight: 600)
+        self.hi_label = ctk.CTkLabel(
+            greet_row, 
+            text="Hi, Mozart", 
+            font=ctk.CTkFont(family="Clash Grotesk", size=64, weight="bold"),
+            text_color=self.TEXT_DARK_BLUE,
+            height=79
+        )
+        self.hi_label.pack(side="left")
+
+        # Frame 69 (Panda Emot Logo - size 65px matching CSS Frame 69)
+        self.emot_logo = PandaiEmotLogo(greet_row, size=65)
+        self.emot_logo.pack(side="left", padx=(10, 0))
+
+        # Subtext: Sudah siap untuk petualangan hari ini?
+        ctk.CTkLabel(
+            header_container, 
+            text="Sudah siap untuk petualangan hari ini?", 
+            font=ctk.CTkFont(family="Inter", size=22, weight="bold"),
+            text_color="#0041C9" # Aligned with CSS Gradient color start #0041C9
+        ).pack(anchor="w", pady=(12, 0))
+
+    def setup_stats_row(self):
+        # Auto layout, gap: 16px
+        row = ctk.CTkFrame(self.inner, fg_color="transparent")
+        row.pack(fill="x", pady=(0, 32)) # Gap to next section: 32px
+        
+        assets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+        
+        stats_config = [
+            ("Total Waktu Belajar Mingguan", "42.5h", "+12%", "Icon_Jam_Total Waktu Belajar Mingguan.svg", "#0066FF"),
+            ("Rata-Rata Skor Fokus", "88%", "+5.2%", "Icon_musik_Rata Rata Skor Fokus.svg", "#8A2BE2"),
+            ("Tingkat Retensi", "76%", "+2.1%", "Icon_Data_Tingkat Retensi.svg", "#0066FF"),
+            ("Beban Kognitif", "Medium", "-3.4%", "Icon_Chart_Beban Kognitif.svg", "#5F1DE2")
+        ]
+
+        for title, val, growth, icon_file, accent in stats_config:
+            self.create_stat_card(row, title, val, growth, icon_file, accent, assets_dir)
+
+    def create_stat_card(self, parent, title, val, growth, icon_file, accent_color, assets_dir):
+        # Adaptive width, height: 150px, border-radius: 24px
+        card = ctk.CTkFrame(
+            parent, 
+            height=150, 
+            fg_color="#FFFFFF", 
+            corner_radius=self.CORNER_RADIUS, 
+            border_width=1, 
+            border_color="#E2E8F0"
+        )
+        card.pack(side="left", padx=(0, 16), expand=True, fill="both")
+        card.pack_propagate(False)
+
+        # Header Row (Title + Icon)
+        head = ctk.CTkFrame(card, fg_color="transparent")
+        head.pack(fill="x", padx=24, pady=(24, 0))
+        
+        # Title (Clash Grotesk Variable, 16px, weight: 600)
+        ctk.CTkLabel(
+            head, text=title, 
+            font=ctk.CTkFont(family="Clash Grotesk", size=14, weight="bold"), 
+            text_color="#64748B",
+            wraplength=180,
+            justify="left",
+            anchor="w"
+        ).pack(side="left", fill="x", expand=True)
+
+        # Icon SVG (Vector background logic)
+        icon_path = os.path.join(assets_dir, icon_file)
+        if os.path.exists(icon_path):
+            with open(icon_path, "r") as f:
+                svg_data = f.read()
+            # Apply accent color to all fill/stroke attributes (brute force tinting)
+            import re
+            svg_data = re.sub(r'fill="[^"]*"', f'fill="{accent_color}"', svg_data)
+            svg_data = re.sub(r'stroke="[^"]*"', f'stroke="{accent_color}"', svg_data)
+            
+            img = load_svg_as_pil(None, width=24, height=28, svg_data=svg_data)
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(24, 28))
+            ctk.CTkLabel(head, image=ctk_img, text="").pack(side="right")
+
+        # Value (Space Grotesk, 30px, bold)
+        ctk.CTkLabel(
+            card, text=val, 
+            font=ctk.CTkFont(family="Space Grotesk", size=30, weight="bold"), 
+            text_color="#0F172A",
+            anchor="w"
+        ).pack(fill="x", padx=24, pady=(10, 0))
+        
+        # Growth (Space Grotesk, 14px, bold)
+        g_color = "#00C853" if "+" in growth else "#F59E0B"
+        ctk.CTkLabel(
+            card, text=growth, 
+            font=ctk.CTkFont(family="Space Grotesk", size=14, weight="bold"), 
+            text_color=g_color,
+            anchor="w"
+        ).pack(fill="x", padx=24, pady=(5, 0))
+
+    def setup_bottom_grid(self):
+        # 1. Top Section Header (Title + System Status)
+        top_header = ctk.CTkFrame(self.inner, fg_color="transparent")
+        top_header.pack(fill="x", pady=(0, 24))
+        
+        ctk.CTkLabel(
+            top_header, text="Mulai Belajar", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=24, weight="bold"), 
+            text_color="#0F172A"
+        ).pack(side="left")
+
+        # Green Status Badge (SISTEM SIAP)
+        status_badge = ctk.CTkFrame(top_header, fg_color="#E8F9F1", corner_radius=9999, border_width=1, border_color="#D1F2E1")
+        status_badge.pack(side="right")
+        ctk.CTkLabel(
+            status_badge, text="SISTEM SIAP", 
+            text_color="#10B981", 
+            font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+            padx=16, pady=6
+        ).pack()
+
+        # 2. Main Grid Layout (2-Column Responsive)
+        grid = ctk.CTkFrame(self.inner, fg_color="transparent")
+        grid.pack(fill="both", expand=True)
+        grid.grid_columnconfigure(0, weight=4) # Timer Col
+        grid.grid_columnconfigure(1, weight=6) # Health Col
+        
+        # LEFT COLUMN (Timer Section)
+        left_col = ctk.CTkFrame(grid, fg_color="transparent")
+        left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 24))
+
+        learn_card = ctk.CTkFrame(
+            left_col, fg_color="#FFFFFF", corner_radius=self.CORNER_RADIUS, 
+            border_width=1, border_color="#E2E8F0", height=596
+        )
+        learn_card.pack(fill="both", expand=True)
+        learn_card.pack_propagate(False)
+
+        # Better Timer UI (Matching Image)
+        timer_container = ctk.CTkFrame(learn_card, fg_color="transparent", width=240, height=240)
+        timer_container.pack(pady=(80, 40))
+        
+        canvas = tk.Canvas(timer_container, width=240, height=240, bg="#FFFFFF", highlightthickness=0)
+        canvas.pack()
+        # Outer Ring
+        canvas.create_oval(10, 10, 230, 230, outline="#F1F5F9", width=14)
+        # Active Progress
+        canvas.create_arc(10, 10, 230, 230, start=90, extent=-300, outline="#4F46E5", width=14, style="arc")
+        # Time Text
+        canvas.create_text(120, 110, text="25:00", font=("Plus Jakarta Sans", 48, "bold"), fill="#0F172A")
+        canvas.create_text(120, 150, text="MENIT", font=("Plus Jakarta Sans", 12, "bold"), fill="#94A3B8")
+
+        # Play Button
+        ctk.CTkButton(
+            learn_card, text="▶  Mulai Sesi", fg_color="#4F46E5", hover_color="#3730A3",
+            corner_radius=16, height=60, width=240, 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=18, weight="bold")
+        ).pack(pady=(0, 20))
+        
+        ctk.CTkLabel(
+            learn_card, text="Target: Fokus / Deep Work", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=14), 
+            text_color="#64748B"
+        ).pack()
+
+        # RIGHT COLUMN (Health Section)
+        right_col = ctk.CTkFrame(grid, fg_color="transparent")
+        right_col.grid(row=0, column=1, sticky="nsew")
+
+        health_card = ctk.CTkFrame(
+            right_col, fg_color="#FFFFFF", corner_radius=self.CORNER_RADIUS, 
+            border_width=1, border_color="#E2E8F0", height=596
+        )
+        health_card.pack(fill="both", expand=True)
+        health_card.pack_propagate(False)
+
+        # Header Row inside Health card
+        top_row = ctk.CTkFrame(health_card, fg_color="transparent")
+        top_row.pack(fill="x", padx=32, pady=(32, 24))
+        
+        title_cont = ctk.CTkFrame(top_row, fg_color="transparent")
+        title_cont.pack(side="left")
+        
+        # Load Heart SVG Icon
+        assets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+        heart_icon_path = os.path.join(assets_dir, "Icon_Hati_Status Biologis Real-time.svg")
+        if os.path.exists(heart_icon_path):
+            heart_img = load_svg_as_pil(heart_icon_path, width=24, height=21)
+            heart_ctk_img = ctk.CTkImage(light_image=heart_img, dark_image=heart_img, size=(24, 21))
+            ctk.CTkLabel(title_cont, image=heart_ctk_img, text="").pack(side="left")
+        else:
+            ctk.CTkLabel(title_cont, text="❤️", font=ctk.CTkFont(size=22)).pack(side="left")
+
+        ctk.CTkLabel(
+            title_cont, text="Status Biologis Real-time", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=24, weight="bold"), 
+            text_color="#0F172A"
+        ).pack(side="left", padx=(12, 0))
+        
+        badge = ctk.CTkFrame(top_row, fg_color="#EEF2FF", corner_radius=9999, border_width=1, border_color="#E0E7FF")
+        badge.pack(side="right")
+        ctk.CTkLabel(badge, text="✨", text_color="#4F46E5", font=ctk.CTkFont(size=14)).pack(side="left", padx=(10, 4), pady=4)
+        ctk.CTkLabel(badge, text="AI MONITORING AKTIF", text_color="#4F46E5", font=ctk.CTkFont(family="Inter", size=12, weight="bold")).pack(side="left", padx=(0, 10), pady=4)
+
+        # AI Recommendation Box (Gradientish: #EEF2FF to #FAF5FF)
+        # CTk doesn't support gradients directly on frames, so we use a light background color 
+        # that approximates the start of the gradient for a clean look.
+        ai_box = ctk.CTkFrame(health_card, fg_color="#F3F6FF", corner_radius=16, border_width=1, border_color="#E0E7FF", height=125)
+        ai_box.pack(fill="x", padx=32, pady=(0, 24))
+        ai_box.pack_propagate(False)
+
+        # Left Icon (Meditation Circle)
+        icon_circle = ctk.CTkFrame(ai_box, width=48, height=48, corner_radius=24, fg_color="#FFFFFF")
+        icon_circle.place(x=20, y=38) # Centered vertically roughly
+        ctk.CTkLabel(icon_circle, text="🧘", font=ctk.CTkFont(size=20)).place(relx=0.5, rely=0.5, anchor="center")
+
+        # Text Content
+        ctk.CTkLabel(
+            ai_box, text="Rekomendasi Istirahat AI", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=14, weight="bold"), 
+            text_color="#312E81"
+        ).place(x=84, y=24)
+        
+        ctk.CTkLabel(
+            ai_box, text="Detak jantung Anda meningkat (92 BPM), luangkan waktu 5 menit untuk bernapas dalam agar fokus kembali optimal.", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=11), 
+            text_color="#4338CA", 
+            wraplength=300, justify="left"
+        ).place(x=84, y=48)
+
+        # Right Button
+        ctk.CTkButton(
+            ai_box, text="3s Mulai Istirahat", fg_color="#4F46E5", hover_color="#3730A3",
+            corner_radius=12, width=138, height=36, font=ctk.CTkFont(size=12, weight="bold")
+        ).place(x=400, y=45)
+
+        # Vitals Panels Row
+        vitals_row = ctk.CTkFrame(health_card, fg_color="transparent")
+        vitals_row.pack(fill="x", padx=32, pady=(0, 24))
+
+        # 1. Heart Rate
+        hr_card = ctk.CTkFrame(vitals_row, fg_color="#FFF1F2", corner_radius=16, border_width=1, border_color="#FECDD3", height=147)
+        hr_card.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        ctk.CTkLabel(hr_card, text="📈 HEART RATE", font=ctk.CTkFont(size=10, weight="bold"), text_color="#E11D48").pack(anchor="w", padx=16, pady=(16, 0))
+        
+        hr_val_row = ctk.CTkFrame(hr_card, fg_color="transparent")
+        hr_val_row.pack(anchor="w", padx=16)
+        ctk.CTkLabel(hr_val_row, text="92", font=ctk.CTkFont(family="Plus Jakarta Sans", size=28, weight="bold"), text_color="#0F172A").pack(side="left")
+        ctk.CTkLabel(hr_val_row, text="BPM", font=ctk.CTkFont(family="Plus Jakarta Sans", size=12), text_color="#64748B").pack(side="left", padx=4, pady=(8,0))
+        
+        hr_canvas = tk.Canvas(hr_card, height=40, bg="#FFF1F2", highlightthickness=0)
+        hr_canvas.pack(fill="x", padx=16, pady=(10, 16))
+        bars = [16, 24, 20, 40, 24]
+        colors = ["#FECDD3", "#FDA4AF", "#FB7185", "#F43F5E", "#FB7185"]
+        for i, h in enumerate(bars):
+            hr_canvas.create_rectangle(i*22, 40-h, i*22+12, 40, fill=colors[i], outline="", width=0)
+
+        # 2. Stress Level
+        stress_card = ctk.CTkFrame(vitals_row, fg_color="#FFFBEB", corner_radius=16, border_width=1, border_color="#FEF3C7", height=147)
+        stress_card.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        ctk.CTkLabel(stress_card, text="🌱 STRESS LEVEL", font=ctk.CTkFont(size=10, weight="bold"), text_color="#D97706").pack(anchor="w", padx=16, pady=(16, 0))
+        ctk.CTkLabel(stress_card, text="Tinggi", font=ctk.CTkFont(family="Plus Jakarta Sans", size=28, weight="bold"), text_color="#0F172A").pack(anchor="w", padx=16)
+        
+        stress_pb_bg = ctk.CTkFrame(stress_card, height=8, fg_color="#E2E8F0", corner_radius=4)
+        stress_pb_bg.pack(fill="x", padx=16, pady=(12, 4))
+        stress_pb_fill = ctk.CTkFrame(stress_pb_bg, width=80, height=8, fg_color="#F59E0B", corner_radius=4)
+        stress_pb_fill.place(x=0, y=0)
+        ctk.CTkLabel(stress_card, text="BUTUH RELAKSASI", font=ctk.CTkFont(size=10, weight="bold"), text_color="#D97706").pack(anchor="w", padx=16)
+
+        # 3. Oxygen
+        ox_card = ctk.CTkFrame(vitals_row, fg_color="#F0F9FF", corner_radius=16, border_width=1, border_color="#E0F2FE", height=147)
+        ox_card.pack(side="left", fill="both", expand=True)
+        ctk.CTkLabel(ox_card, text="💧 OKSIGEN", font=ctk.CTkFont(size=10, weight="bold"), text_color="#0284C7").pack(anchor="w", padx=16, pady=(16, 0))
+        
+        ox_val_row = ctk.CTkFrame(ox_card, fg_color="transparent")
+        ox_val_row.pack(anchor="w", padx=16)
+        ctk.CTkLabel(ox_val_row, text="98", font=ctk.CTkFont(family="Plus Jakarta Sans", size=28, weight="bold"), text_color="#0F172A").pack(side="left")
+        ctk.CTkLabel(ox_val_row, text="%", font=ctk.CTkFont(family="Plus Jakarta Sans", size=12), text_color="#64748B").pack(side="left", padx=4, pady=(8,0))
+        
+        ox_canvas = tk.Canvas(ox_card, height=32, bg="#F0F9FF", highlightthickness=0)
+        ox_canvas.pack(fill="x", padx=16, pady=(10, 16))
+        fill_colors = ["#BAE6FD", "#7DD3FC", "#38BDF8", "#0EA5E9", "#0284C7"]
+        for i in range(5):
+             ox_canvas.create_rectangle(i*24, 8, i*24+8, 32, fill=fill_colors[i], outline="", width=0)
+
+        # 4. DASHED FOCUS GRAPH SECTION (New bottom area from CSS)
+        focus_history = ctk.CTkFrame(
+            health_card, fg_color="#F8FAFC", corner_radius=16, 
+            border_width=1, border_color="#CBD5E1" 
+        )
+        focus_history.pack(fill="x", padx=32, pady=(0, 32))
+        
+        # Header for Focus History
+        fh_header = ctk.CTkFrame(focus_history, fg_color="transparent")
+        fh_header.pack(fill="x", padx=24, pady=(24, 16))
+        
+        fh_text_cont = ctk.CTkFrame(fh_header, fg_color="transparent")
+        fh_text_cont.pack(side="left")
+        ctk.CTkLabel(
+            fh_text_cont, text="Analisis Kualitas Fokus", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=14, weight="bold"), 
+            text_color="#0F172A"
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            fh_text_cont, text="Berdasarkan data gelombang otak 30 menit terakhir", 
+            font=ctk.CTkFont(family="Plus Jakarta Sans", size=11), 
+            text_color="#64748B"
+        ).pack(anchor="w")
+
+        # Live Badge
+        live_badge = ctk.CTkFrame(fh_header, fg_color="transparent")
+        live_badge.pack(side="right")
+        ctk.CTkFrame(live_badge, width=8, height=8, corner_radius=4, fg_color="#4F46E5").pack(side="left", padx=4)
+        ctk.CTkLabel(live_badge, text="LIVE DATA", font=ctk.CTkFont(size=10, weight="bold"), text_color="#4F46E5").pack(side="left")
+
+        # Sparkline-like graph
+        spark_canvas = tk.Canvas(focus_history, height=40, bg="#F8FAFC", highlightthickness=0)
+        spark_canvas.pack(fill="x", padx=24, pady=(0, 24))
+        for i in range(30):
+            h = random.randint(10, 35)
+            spark_canvas.create_rectangle(i*14, 40-h, i*14+4, 40, fill="#4F46E5", outline="", width=0)
+
+        # 5. UPCOMING TASKS (Frame 76038 / Akan Datang) 
+        # Added below the main grid for completeness
+        upcoming_section = ctk.CTkFrame(self.inner, fg_color="transparent")
+        upcoming_section.pack(fill="x", pady=(32, 40))
+
+        ctk.CTkLabel(
+            upcoming_section, text="Tugas dalam tenggat", 
+            font=ctk.CTkFont(family="Inter", size=22, weight="bold"), 
+            text_color="#0F172A"
+        ).pack(anchor="w", pady=(0, 16))
+
+        task_container = ctk.CTkFrame(upcoming_section, fg_color="transparent")
+        task_container.pack(fill="x")
+
+        # Example Task Card (Matching CSS linear-gradient(90deg, #E2EBFF 0%, #FFFFFF 20.32%))
+        for i in range(2):
+            task_card = ctk.CTkFrame(
+                task_container, height=80, fg_color="#FFFFFF", border_width=1, 
+                border_color="#E2E8F0", corner_radius=20
+            )
+            task_card.pack(fill="x", pady=4)
+            task_card.pack_propagate(False)
+
+            # Left side: Icon + Content
+            left_side = ctk.CTkFrame(task_card, fg_color="#E2EBFF", width=6, corner_radius=0)
+            left_side.pack(side="left", fill="y")
+
+            content = ctk.CTkFrame(task_card, fg_color="transparent")
+            content.pack(side="left", padx=24, fill="y")
+            
+            ctk.CTkLabel(
+                content, text="Tugas Bahasa Inggris: Past Tense" if i == 0 else "Ujian Matematika: Kalkulus", 
+                font=ctk.CTkFont(family="Inter", size=16, weight="bold"), text_color="#1D115A" 
+            ).pack(anchor="w", pady=(18, 0))
+            
+            # Deadline Badge
+            deadline = ctk.CTkFrame(task_card, fg_color="transparent", border_width=1, border_color="#E2E8F0", corner_radius=36)
+            deadline.pack(side="right", padx=24)
+            ctk.CTkLabel(
+                deadline, text="22 November 2025" if i == 0 else "Besok, 08:00 WIB", 
+                font=ctk.CTkFont(family="Inter", size=11, weight="bold"), 
+                text_color="#64748B", padx=12, pady=4
+            ).pack()
+

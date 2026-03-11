@@ -1,0 +1,25 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Padded Headband -->
+  <path d="M3 12V10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10V12" stroke="#292D32" stroke-width="1.8" stroke-linecap="round"/>
+  
+  <!-- Inner Comfort Bridge (Detail) -->
+  <path d="M5 11.5V10.5C5 6.63401 8.13401 3.5 12 3.5C15.866 3.5 19 6.63401 19 10.5V11.5" stroke="#292D32" stroke-width="0.8" stroke-dasharray="1 2"/>
+
+  <!-- Left Acoustic Earcup (Neural Grade) -->
+  <rect x="1.5" y="10.5" width="5" height="10" rx="2.5" fill="#292D32"/>
+  <rect x="5.5" y="12.5" width="1.5" height="6" rx="0.75" fill="#292D32" fill-opacity="0.6"/> <!-- Cushion Detail -->
+  <circle cx="4" cy="15.5" r="0.8" fill="white" fill-opacity="0.4"/> <!-- Sensor Detail -->
+
+  <!-- Right Acoustic Earcup (Neural Grade) -->
+  <rect x="17.5" y="10.5" width="5" height="10" rx="2.5" fill="#292D32"/>
+  <rect x="17" y="12.5" width="1.5" height="6" rx="0.75" fill="#292D32" fill-opacity="0.6"/>
+  <circle cx="20" cy="15.5" r="0.8" fill="white" fill-opacity="0.4"/>
+
+  <!-- Adjuster Rivets -->
+  <circle cx="3" cy="10" r="0.7" fill="#292D32"/>
+  <circle cx="21" cy="10" r="0.7" fill="#292D32"/>
+  
+  <!-- Slim Mic / Neural Link Arm -->
+  <path d="M4 19.5C4 20.8807 5.11929 22 6.5 22H9.5" stroke="#292D32" stroke-width="1.2" stroke-linecap="round"/>
+  <rect x="9" y="21" width="2.5" height="2" rx="0.5" fill="#292D32"/> <!-- Neural Transmitter Tip -->
+</svg>
