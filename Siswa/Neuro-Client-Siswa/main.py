@@ -12,6 +12,11 @@ from pages.statistik_anda import StatistikPage
 from pages.profil_anda import ProfilPage
 from pages.debug_display import DebugDisplayPage
 
+# Import Core Systems
+from network.mqtt_client import MQTTClient
+from ai.ollama_client import LocalAIClient
+from core.decision_engine import DecisionEngine
+
 # --- KONFIGURASI DESAIN PANDAI (FIGMA SPEC) ---
 COLOR_APP_BG = "#F8F8F8"
 COLOR_SIDEBAR_BG = "#F8F8F8"
@@ -78,8 +83,40 @@ class NeuroClientApp(ctk.CTk):
         self._last_height = 0
         self.bind("<Configure>", self.on_window_resize)
 
+        # 7. INIT BACKGROUND SYSTEMS
+        self.init_core_systems()
+
         # Start with Beranda
         self.select_page("Beranda")
+
+        # Cleanup on exit
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def init_core_systems(self):
+        print("Membangunkan Core Systems...")
+        # 1. Start MQTT (The Bridge)
+        self.mqtt = MQTTClient(broker_host="localhost", broker_port=1883)
+        self.mqtt.connect()
+        
+        # 2. Local AI Connection
+        self.ai_client = LocalAIClient(host="localhost", port=11434, model="gemma2:2b")
+        
+        # 3. Decision Engine (The Brain)
+        self.engine = DecisionEngine(mqtt_client=self.mqtt, ai_client=self.ai_client)
+        self.engine.start_simulation()
+
+    def on_closing(self):
+        print("Tutup app, mematikan Engine & MQTT...")
+        # Ensure overlay from Beranda is cleaned up
+        if hasattr(self, 'pages') and 'Beranda' in self.pages:
+            beranda = self.pages['Beranda']
+            if hasattr(beranda, '_destroy_overlay'):
+                beranda._destroy_overlay()
+        if hasattr(self, 'engine'):
+            self.engine.stop()
+        if hasattr(self, 'mqtt'):
+            self.mqtt.disconnect()
+        self.destroy()
 
     def on_window_resize(self, event):
         """Handle dynamic background scaling and layout adjustments for TV/Laptop focus"""
