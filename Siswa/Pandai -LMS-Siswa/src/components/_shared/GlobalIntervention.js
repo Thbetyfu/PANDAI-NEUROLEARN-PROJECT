@@ -90,27 +90,6 @@ export default function GlobalIntervention({ children }) {
                 </div>
             )}
 
-            {/* Simulation Debug Window untuk Fase 3.1 Testing */}
-            <div className="fixed bottom-4 right-4 z-[9999] bg-white p-3 rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-gray-100 opacity-30 hover:opacity-100 transition-opacity">
-                <h4 className="text-[10px] font-bold text-gray-800 mb-2 uppercase tracking-wide">Neuro-Client Shield Test</h4>
-                <label className="flex items-center space-x-2 text-xs mb-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={isSimulating}
-                        onChange={(e) => setIsSimulating(e.target.checked)}
-                        className="rounded text-blue-600"
-                    />
-                    <span className="font-semibold text-gray-700">Override Mode Simulasi</span>
-                </label>
-                {isSimulating && (
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <button onClick={() => triggerSimulation('DROWSY')} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-2 py-1.5 rounded transition">😴 Drowsy</button>
-                        <button onClick={() => triggerSimulation('HIGH_STRESS')} className="bg-red-500 hover:bg-red-600 text-white font-bold px-2 py-1.5 rounded transition">⚠️ Stress</button>
-                        <button onClick={() => triggerSimulation('FATIGUE')} className="bg-purple-500 hover:bg-purple-600 text-white font-bold px-2 py-1.5 rounded transition">😫 Fatigue</button>
-                        <button onClick={() => triggerSimulation('NORMAL')} className="bg-green-500 hover:bg-green-600 text-white font-bold px-2 py-1.5 rounded transition">✅ Normal</button>
-                    </div>
-                )}
-            </div>
         </>
     );
 }

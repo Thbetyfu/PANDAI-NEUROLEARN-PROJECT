@@ -1,9 +1,11 @@
 import React from 'react';
 import { Copy, Activity, Brain, Eye } from 'lucide-react';
 import { useNeuroMqtt } from '../../hooks/useNeuroMqtt';
+import { useNeuroListener } from '@/hooks/useNeuroListener';
 
 export default function ProfileScreen() {
   const { neuroData, status } = useNeuroMqtt();
+  const { isSimulating, setIsSimulating, triggerSimulation } = useNeuroListener();
 
   return (
     <div className='px-6 pb-24 pt-8'>
@@ -58,12 +60,34 @@ export default function ProfileScreen() {
 
           {/* Alert Intervensi: Sekarang di dalam scrollable content, tidak menutupi navbar */}
           {neuroData?.payload?.metrics?.ear_score < 0.22 && typeof neuroData?.payload?.metrics?.ear_score === 'number' && (
-            <div className='p-3 bg-orange-50 border border-orange-200 rounded-xl animate-pulse'>
+            <div className='p-3 bg-orange-50 border border-orange-200 rounded-xl animate-pulse mb-4'>
               <p className='text-[11px] text-orange-700 font-bold flex items-center gap-2'>
                 <Eye size={14} /> Sistem mendeteksi kamu mengantuk. Segarkan dirimu!
               </p>
             </div>
           )}
+
+          {/* Simulation Debug Window (dipindah ke dalam layar Profil) */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <h4 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wide">Panel Simulasi Tester</h4>
+            <label className="flex items-center space-x-2 text-xs mb-3 cursor-pointer p-2 bg-gray-50 rounded-lg">
+              <input
+                type="checkbox"
+                checked={isSimulating}
+                onChange={(e) => setIsSimulating(e.target.checked)}
+                className="rounded text-blue-600"
+              />
+              <span className="font-semibold text-gray-700">Override Mode Simulasi Intervensi</span>
+            </label>
+            {isSimulating && (
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <button onClick={() => triggerSimulation('DROWSY')} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-2 py-2 rounded-xl transition">😴 Drowsy</button>
+                <button onClick={() => triggerSimulation('HIGH_STRESS')} className="bg-red-500 hover:bg-red-600 text-white font-bold px-2 py-2 rounded-xl transition">⚠️ Stress</button>
+                <button onClick={() => triggerSimulation('FATIGUE')} className="bg-purple-500 hover:bg-purple-600 text-white font-bold px-2 py-2 rounded-xl transition">😫 Fatigue</button>
+                <button onClick={() => triggerSimulation('NORMAL')} className="bg-green-500 hover:bg-green-600 text-white font-bold px-2 py-2 rounded-xl transition">✅ Normal</button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Informasi Pribadi */}
