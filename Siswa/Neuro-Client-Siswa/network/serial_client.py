@@ -31,6 +31,16 @@ class SerialClient:
 
     def send_command(self, cmd_type, value):
         if self.is_connected:
+            # SAFETY COMPLIANCE: Hard limit tDCS maksimal 2.0 mA
+            if cmd_type == "SET_CURRENT":
+                try:
+                     val_float = float(value)
+                     if val_float > 2.0:
+                          print(f"[Serial] 🛡️ SAFETY BLOCK: Arus {val_float}mA melebihi batas 2.0mA. DITOLAK.")
+                          return # Batalkan eksekusi
+                except ValueError:
+                     pass
+
             # Format sesuai protocol-iot.md: SET_CURRENT|1.5
             msg = f"{cmd_type}|{value}\n"
             try:

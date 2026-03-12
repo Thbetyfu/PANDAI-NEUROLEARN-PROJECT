@@ -1,0 +1,30 @@
+[Shield] 🔴 AMIGDALA ALERT: EAR rendah (0.1). MENGANTUK!
+[Engine] Meminta instruksi AI untuk status: DROWSY
+
+🧠 [PANDAI AI Core]: <MagicMock name='mock.get_suggestion()' id='2124540357536'>
+
+.[Shield] 🔴 STRES TINGGI: GSR melonjak dari 0.4 ke 0.47
+[Engine] Meminta instruksi AI untuk status: STRESS
+
+🧠 [PANDAI AI Core]: <MagicMock name='mock.get_suggestion()' id='2124525563744'>
+
+..E[Serial] ✅ Terhubung ke ESP32 di COM_DUMMY
+[Serial] Kirim: SET_LIGHT|#FFFFFF|100
+..
+======================================================================
+ERROR: test_safety_compliance_2ma_limit (tests.test_neuro_fase2.TestNeuroClientFase2.test_safety_compliance_2ma_limit)
+@doc Aturan WAJIB Neuromodulasi: DILARANG keras arus melebihi 2.0mA.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\thori\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\0. Kerjaan\4. PANDAI\Siswa\Neuro-Client-Siswa\tests\test_neuro_fase2.py", line 160, in test_safety_compliance_2ma_limit
+    mock_serial_class.side_effect = serial.SerialException("Port tidak ada E01")
+                                    ^^^^^^
+NameError: name 'serial' is not defined
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.025s
+
+FAILED (errors=1)
