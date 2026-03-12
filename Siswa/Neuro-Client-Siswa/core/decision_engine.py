@@ -130,7 +130,8 @@ class DecisionEngine:
              "gsr_microsiemens": round(self.current_gsr, 2),
              "hrv_rmssd_ms": round(self.current_hrv, 1),
              "ear_score": round(self.current_ear, 2),
-             "cognitive_load": round(self.cognitive_load, 1)
+             "cognitive_load": round(self.cognitive_load, 1),
+             "state": self.current_state
         }
 
         hardware = {
