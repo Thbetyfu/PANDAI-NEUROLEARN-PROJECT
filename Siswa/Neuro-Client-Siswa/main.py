@@ -14,8 +14,10 @@ from pages.debug_display import DebugDisplayPage
 
 # Import Core Systems
 from network.mqtt_client import MQTTClient
+from network.serial_client import SerialClient
 from ai.ollama_client import LocalAIClient
 from core.decision_engine import DecisionEngine
+from sensors.vision_engine import VisionEngine
 
 # --- KONFIGURASI DESAIN PANDAI (FIGMA SPEC) ---
 COLOR_APP_BG = "#F8F8F8"
@@ -93,20 +95,46 @@ class NeuroClientApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def init_core_systems(self):
-        print("Membangunkan Core Systems...")
-        # 1. Start MQTT (The Bridge)
+        print("="*60)
+        print("  PANDAI NEUROLEARN 2.0 — Core Systems Startup")
+        print("="*60)
+
+        # 1. MQTT (The Bridge to Dashboard)
         self.mqtt = MQTTClient(broker_host="localhost", broker_port=1883)
         self.mqtt.connect()
-        
-        # 2. Local AI Connection
+
+        # 2. Serial Client (The Bridge to ESP32)
+        self.serial = SerialClient(port=None)  # None = tidak ada ESP32 tercolok
+        # Uncomment dan ganti port untuk koneksi real:
+        # self.serial = SerialClient(port="COM3", baudrate=115200)
+        # self.serial.connect()
+
+        # 3. Vision Engine (The Eyes — EAR via Kamera)
+        self.vision = VisionEngine(camera_index=0)
+        vision_ok = self.vision.start()
+        if not vision_ok:
+            print("[Main] Kamera tidak tersedia. Fallback ke simulasi EAR.")
+            self.vision = None
+
+        # 4. Local AI (Ollama)
         self.ai_client = LocalAIClient(host="localhost", port=11434, model="gemma2:2b")
-        
-        # 3. Decision Engine (The Brain)
-        self.engine = DecisionEngine(mqtt_client=self.mqtt, ai_client=self.ai_client)
-        self.engine.start_simulation()
+
+        # 5. Decision Engine (The Brain — Amigdala Shield)
+        self.engine = DecisionEngine(
+            mqtt_client=self.mqtt,
+            serial_client=self.serial if self.serial.connected else None,
+            ai_client=self.ai_client,
+            vision_engine=self.vision,
+            mode="hybrid",
+        )
+        self.engine.start()
+
+        print("="*60)
+        print("  Core Systems: ONLINE")
+        print("="*60)
 
     def on_closing(self):
-        print("Tutup app, mematikan Engine & MQTT...")
+        print("Tutup app, mematikan semua sistem...")
         # Ensure overlay from Beranda is cleaned up
         if hasattr(self, 'pages') and 'Beranda' in self.pages:
             beranda = self.pages['Beranda']
@@ -114,6 +142,10 @@ class NeuroClientApp(ctk.CTk):
                 beranda._destroy_overlay()
         if hasattr(self, 'engine'):
             self.engine.stop()
+        if hasattr(self, 'vision') and self.vision:
+            self.vision.stop()
+        if hasattr(self, 'serial'):
+            self.serial.disconnect()
         if hasattr(self, 'mqtt'):
             self.mqtt.disconnect()
         self.destroy()

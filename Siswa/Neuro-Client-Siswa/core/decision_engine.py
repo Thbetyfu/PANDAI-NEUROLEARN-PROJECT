@@ -1,143 +1,155 @@
 import time
-import random
 import threading
 from datetime import datetime
 
 class DecisionEngine:
-    def __init__(self, mqtt_client=None, ai_client=None):
+    def __init__(self, mqtt_client=None, serial_client=None, ai_client=None, vision_engine=None, mode="hybrid"):
         self.mqtt_client = mqtt_client
         self.ai_client = ai_client
-        
+        self.serial = serial_client
+        self.vision = vision_engine
+
         self.running = False
         self.session_id = f"SESS-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
+
         # State Internal
         self.current_state = "FLOW"
-        
-        # Biometrik Simulasi
-        self.current_ear = 0.35
+
+        # Biometrik Data
+        self.current_ear = 0.5
         self.current_gsr = 0.30
-        self.current_hrv = 60.0 # RMSSD mst
+        self.prev_gsr = 0.30
+        self.current_hrv = 60.0
         self.cognitive_load = 40.0
         
-        # Hardware Status Simulasi
+        # Hardware Status
         self.tdcs_ma = 0.0
         self.lamp_intensity = 50
         self.impedance = 15000
-        
-    def start_simulation(self):
-        print("[Engine] Memulai Simulasi Amigdala Shield...")
+
+    def start(self):
+        print("[Engine] Mengaktifkan Operasi Otak Terpadu...")
         self.running = True
-        
-        # Mulai thread simulasi loop
-        self.sim_thread = threading.Thread(target=self._run_loop, daemon=True)
-        self.sim_thread.start()
-        
+        if self.vision and not self.vision.is_running:
+            self.vision.start()
+        threading.Thread(target=self._run_loop, daemon=True).start()
+
+    def start_simulation(self):
+         self.start()
+
     def stop(self):
-        print("[Engine] Menghentikan Engine.")
         self.running = False
-        
+        if self.vision:
+             self.vision.stop()
+
     def _run_loop(self):
         while self.running:
-            # 1. Update nilai simulasi (berfluktuasi sedikit)
-            self._simulate_fluctuations()
-            
-            # 2. Confusion Pinpointing Logic & Amigdala Shield
+            # 1. Update data dari Vision (kamera)
+            if self.vision:
+                 self.current_ear = self.vision.get_ear()
+
+            # 2. Update data dari Serial (ESP32)
+            if self.serial:
+                 bio_data = self.serial.get_bio_data()
+                 if bio_data:
+                     self.prev_gsr = self.current_gsr
+                     self.current_gsr = bio_data.get('gsr', self.current_gsr)
+                     self.current_hrv = bio_data.get('hrv', self.current_hrv)
+                     self.impedance = bio_data.get('imp', self.impedance)
+
+            # 3. Decision Logic & Amigdala Shield
             self._evaluate_state()
-            
-            # 3. Kirim via MQTT (agar Dashboard dapat data)
+
+            # 4. Kirim telemetry via MQTT
             self._publish_data()
-            
-            # Loop setiap 2 detik
-            time.sleep(2)
-            
-    def _simulate_fluctuations(self):
-        # Angka acak ± 5%
-        self.current_ear = max(0.1, min(0.5, self.current_ear + random.uniform(-0.02, 0.02)))
-        self.current_hrv = max(10, min(100, self.current_hrv + random.uniform(-2, 2)))
-        self.current_gsr = max(0.1, min(1.0, self.current_gsr + random.uniform(-0.01, 0.01)))
-        
-        # Sesekali buat siswa ngantuk atau stress parah
-        if random.random() < 0.05: # 5% chance
-            self.current_ear -= 0.1 # Tiba-tiba EAR drop (ngantuk/merem)
-            print(f"[Sim] ⚠️ Siswa mulai mengantuk. EAR drop ke {self.current_ear:.2f}")
-            
+
+            time.sleep(2) # Setiap 2 detik evaluasi ulang
+
     def _evaluate_state(self):
-        """Inti dari Amigdala Shield Protocol"""
-        
-        # Cek EAR (Eye Aspect Ratio): < 0.22 artinya mengantuk/merem
-        if self.current_ear < 0.22:
+        # Prioritas Tertinggi: Impedansi (Safety)
+        if self.impedance > 50000:
+             print(f"[Shield] 🚨 IMPEDANSI TINGGI ({self.impedance} ohm). HARD CUT-OFF!")
+             if self.serial:
+                  self.serial.send_command("EMERGENCY_OFF", "")
+             if self.mqtt_client and self.mqtt_client.connected:
+                  self.mqtt_client.send_emergency_off()
+             self.running = False
+             return
+
+        # Prioritas 1: GSR Spike Detection (Stres Tinggi) 
+        if self.current_gsr > (self.prev_gsr * 1.15) and self.prev_gsr > 0:
+            if self.current_state != "HIGH_STRESS":
+                print(f"[Shield] 🔴 STRES TINGGI: GSR melonjak dari {self.prev_gsr} ke {self.current_gsr}")
+                self.current_state = "HIGH_STRESS"
+                self.tdcs_ma = 1.0
+                if self.serial:
+                     self.serial.send_command("SET_CURRENT", 1.0)
+                self._trigger_ai("STRESS")
+
+        # Prioritas 2: EAR (Mengantuk)
+        elif self.current_ear < 0.22:
             if self.current_state != "AWAKE_INTERVENTION":
-                print(f"[Shield] 🔴 AMIGDALA ALERT: EAR rendah ({self.current_ear:.2f}). Mengaktifkan AWAKE_INTERVENTION!")
+                print(f"[Shield] 🔴 AMIGDALA ALERT: EAR rendah ({self.current_ear}). MENGANTUK!")
                 self.current_state = "AWAKE_INTERVENTION"
-                
-                # Intervensi: Tingkatkan lampu
                 self.lamp_intensity = 100
-                if self.mqtt_client:
-                    self.mqtt_client.client.publish("pandai/v1/actuator/light", f"#FFFFFF|100")
-                
-                # Panggil AI suggestion
-                self._trigger_ai("Siswa mulai kehilangan kesadaran visual (mengantuk).")
-                
-        # Cek HRV RMSSD: < 20ms artinya Cognitive Fatigue
+                if self.serial:
+                     self.serial.send_command("SET_LIGHT", "#FFFFFF|100")
+                if self.mqtt_client and self.mqtt_client.connected:
+                     self.mqtt_client.client.publish("pandai/v1/actuator/light", "#FFFFFF|100")
+                self._trigger_ai("DROWSY")
+
+        # Prioritas 3: HRV (Fatigue)
         elif self.current_hrv < 20:
              if self.current_state != "FATIGUE":
-                print(f"[Shield] 🔴 AMIGDALA ALERT: HRV sangat rendah ({self.current_hrv:.1f}ms). Kemungkinan FATIGUE.")
+                print(f"[Shield] 🔴 AMIGDALA ALERT: HRV kritis ({self.current_hrv}). FATIGUE!")
                 self.current_state = "FATIGUE"
-                self.tdcs_ma = 0.0 # Hentikan stimulasi jika fatigue parah
-                if self.mqtt_client:
-                    self.mqtt_client.send_emergency_off()
-                    
-                self._trigger_ai("Siswa mengalami kelelahan kognitif parah.")
-                
-        # Cek Impedansi (Hardware Limit) - Simulasi Tiba-tiba elektroda lepas
-        elif self.impedance > 50000:
-             print(f"[Shield] 🚨 IMPEDANSI TINGGI ({self.impedance} ohm). HARD CUT-OFF!")
-             if self.mqtt_client:
-                    self.mqtt_client.send_emergency_off()
-             self.running = False # Hentikan simulasi juga karena darurat hardware
-        # Kondisi Normal/Flow
+                self.tdcs_ma = 0.0
+                if self.serial:
+                     self.serial.send_command("EMERGENCY_OFF", "")
+                if self.mqtt_client and self.mqtt_client.connected:
+                     self.mqtt_client.send_emergency_off()
+                self._trigger_ai("FATIGUE")
+
+        # Prioritas 4: Normal / Flow
         else:
             if self.current_state != "FLOW":
-                print(f"[Shield] 🟢 Kembali ke zona FLOW. EAR: {self.current_ear:.2f}, HRV: {self.current_hrv:.1f}")
+                print(f"[Shield] 🟢 Kembali ke zona FLOW. EAR: {self.current_ear}, HRV: {self.current_hrv}")
                 self.current_state = "FLOW"
                 self.lamp_intensity = 50
-                if self.mqtt_client:
-                     self.mqtt_client.client.publish("pandai/v1/actuator/light", f"#E0F7FA|50")
-                
+                if self.serial:
+                     self.serial.send_command("SET_LIGHT", "#E0F7FA|50")
+                if self.mqtt_client and self.mqtt_client.connected:
+                     self.mqtt_client.client.publish("pandai/v1/actuator/light", "#E0F7FA|50")
+                self._trigger_ai("NORMAL")
+
     def _publish_data(self):
         if not self.mqtt_client or not self.mqtt_client.connected:
             return
-            
+
         metrics = {
              "gsr_microsiemens": round(self.current_gsr, 2),
              "hrv_rmssd_ms": round(self.current_hrv, 1),
              "ear_score": round(self.current_ear, 2),
              "cognitive_load": round(self.cognitive_load, 1)
         }
-        
+
         hardware = {
              "tdcs_output_ma": self.tdcs_ma,
              "lamp_intensity": self.lamp_intensity,
              "skin_impedance_ohm": self.impedance,
              "battery_level": 95
         }
-        
+
         self.mqtt_client.publish_processed_bio(self.session_id, metrics, hardware)
-        # print(f"[Engine] Data terkirim ke MQTT. State: {self.current_state}")
-        
-    def _trigger_ai(self, context):
-        """Minta saran dari Ollama secara asinkron"""
+
+    def _trigger_ai(self, condition):
         if self.ai_client:
-            print(f"[Engine] Meminta saran AI lokal untuk: {context}")
-            # Jalankan di background agar tidak memblokir loop
-            threading.Thread(target=self._fetch_and_print_ai, args=(context,), daemon=True).start()
-        else:
-            print(f"[Bot] Saran Otomatis: Istirahat sejenak 5 menit.")
-            
-    def _fetch_and_print_ai(self, context):
+            print(f"[Engine] Meminta instruksi AI untuk status: {condition}")
+            threading.Thread(target=self._fetch_and_print_ai, args=(condition,), daemon=True).start()
+
+    def _fetch_and_print_ai(self, condition):
         try:
-             saran = self.ai_client.get_suggestion(context)
+             saran = self.ai_client.get_suggestion(condition=condition)
              print(f"\n🧠 [PANDAI AI Core]: {saran}\n")
         except Exception as e:
-             print(f"[AI Error] Timeout: {e}")
+             pass

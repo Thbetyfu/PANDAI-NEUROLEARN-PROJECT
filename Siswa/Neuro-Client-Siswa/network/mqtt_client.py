@@ -83,8 +83,8 @@ class MQTTClient:
             
         topic = "pandai/v1/bio/processed"
         
-        from datetime import datetime
-        timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         
         payload = {
             "header": {

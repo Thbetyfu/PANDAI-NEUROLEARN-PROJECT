@@ -4,40 +4,50 @@ import threading
 
 class LocalAIClient:
     def __init__(self, host="127.0.0.1", port=11434, model="gemma2:2b"):
-        self.base_url = f"http://{host}:{port}/api/generate"
+        # Ganti ke mode chat
+        self.base_url = f"http://{host}:{port}/api/chat"
         self.model = model
         
-    def get_suggestion(self, context, prompt=None):
-        """Memanggil Ollama API secara sinkron"""
+    def get_suggestion(self, context=None, condition=None, prompt=None):
+        """Memanggil Ollama API dengan instruksi berbasis kondisi"""
         
-        # System Prompt khusus PANDAI
-        if not prompt:
-            prompt = (
-                f"Kamu adalah AI asisten pendidik untuk 'PANDAI NEUROLEARN'. "
-                f"Siswa saat ini mengalami masalah: '{context}'. "
-                f"Tolong beri saran singkat 1-2 kalimat (Maksimal 20 kata). "
-                f"Gunakan bahasa Indonesia baku dan ramah, "
-                f"Saran harus mengajak istirahat atau fokus ulang."
-            )
-            
+        # Tambahkan Mapping Prompt
+        PROMPTS = {
+            "DROWSY": "Siswa mengantuk. Berikan instruksi singkat yang memicu adrenalin dan kesegaran!",
+            "STRESS": "Siswa stres tinggi. Pandu teknik pernapasan 4-7-8 sekarang.",
+            "NORMAL": "Siswa fokus. Berikan apresiasi singkat untuk menjaga motivasi.",
+            "FATIGUE": "Siswa sangat kelelahan kognitif. Arahkan siswa istirahat penuh dari menatap layar segera."
+        }
+        
+        # Ambil instruksi default jika kondisi tidak dikenal
+        user_message = PROMPTS.get(condition, "Berikan tips observasi pendidikan.")
+
+        # Override legacy context (Fase 1 compat)
+        if prompt:
+             user_message = prompt
+        elif context and not condition:
+             user_message = f"Siswa mengalami kendala berikut: {context}. Tolong berikan saran 2 kalimat."
+
         payload = {
             "model": self.model,
-            "prompt": prompt,
-            "stream": False # Matikan stream untuk respon utuh sekaligus
+            "messages": [
+                 {"role": "system", "content": "Kamu adalah AI asisten pendidik PANDAI NEUROLEARN. Jawab maksimal 25 kata dengan bahasa Indonesia baku dan memotivasi."},
+                 {"role": "user", "content": user_message}
+            ],
+            "stream": False
         }
         
         headers = {
             "Content-Type": "application/json"
         }
         
-        # print(f"[AI] Menghubungi Ollama di {self.base_url} (Model: {self.model})...")
         try:
-            # Gunakan timeout pendek (10s) agar tidak hang jika server mati
             response = requests.post(self.base_url, json=payload, headers=headers, timeout=10.0)
             
             if response.status_code == 200:
                 data = response.json()
-                return data.get("response", "Tidak ada respon.")
+                message = data.get("message", {})
+                return message.get("content", "Tidak ada respon dari AI.")
             else:
                  return f"Error [{response.status_code}]: {response.text}"
                  
