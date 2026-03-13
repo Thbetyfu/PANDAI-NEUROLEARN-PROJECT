@@ -52,8 +52,8 @@ class LocalAIClient:
                  return f"Error [{response.status_code}]: {response.text}"
                  
         except requests.exceptions.ConnectionError:
-            return "Peringatan E03: Server AI Lokal (Ollama) tidak merespon/mati."
+            return "Tarik napas panjang... mari kita kembalikan fokus optimalmu! ✨ (Ollama Offline)"
         except requests.exceptions.Timeout:
-            return "Peringatan E03: Timeout saat menghubungi AI. Terlalu sibuk."
+            return "Perhatian menurun, coba tegakkan badan ya! (AI Timeout)"
         except Exception as e:
-            return f"Terjadi kesalahan saat memproses AI: {e}"
+            return "Fokus adalah kunci! (AI Fallback)"

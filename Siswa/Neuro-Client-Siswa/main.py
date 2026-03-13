@@ -100,7 +100,8 @@ class NeuroClientApp(ctk.CTk):
         print("="*60)
 
         # 1. MQTT (The Bridge to Dashboard)
-        self.mqtt = MQTTClient(broker_host="localhost", broker_port=1883)
+        # Menggunakan Public/External Broker karena tidak ada Mosquitto lokal
+        self.mqtt = MQTTClient(broker_host="broker.emqx.io", broker_port=1883)
         self.mqtt.connect()
 
         # 2. Serial Client (The Bridge to ESP32)

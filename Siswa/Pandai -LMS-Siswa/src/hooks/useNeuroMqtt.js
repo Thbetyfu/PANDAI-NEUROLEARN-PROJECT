@@ -6,8 +6,8 @@ export const useNeuroMqtt = () => {
     const [status, setStatus] = useState('OFFLINE');
 
     useEffect(() => {
-        // Dinamis mendeteksi IP/Host LMS agar mqtt websocket tidak putus
-        const wsUrl = typeof window !== 'undefined' ? `ws://${window.location.hostname}:9001` : 'ws://localhost:9001';
+        // Dinamis sinkronisasi broker eksteral (karena mosquitto mati di local machine)
+        const wsUrl = 'wss://broker.emqx.io:8084/mqtt';
         const client = mqtt.connect(wsUrl);
 
         client.on('connect', () => {
