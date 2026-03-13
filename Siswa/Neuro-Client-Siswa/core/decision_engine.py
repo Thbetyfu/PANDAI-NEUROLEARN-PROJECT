@@ -26,6 +26,10 @@ class DecisionEngine:
         self.tdcs_ma = 0.0
         self.lamp_intensity = 50
         self.impedance = 15000
+        
+        # Debounce/Filter Variabels
+        self.last_print_time = 0
+        self.drowsy_frames_count = 0
 
     def start(self):
         print("[Engine] Mengaktifkan Operasi Otak Terpadu...")
@@ -60,12 +64,14 @@ class DecisionEngine:
             # 3. Decision Logic & Amigdala Shield
             self._evaluate_state()
 
-            # 4. Kirim telemetry via MQTT
+            # 4. Kirim telemetry via MQTT (ditelan setiap 0.2s untuk fast-response LMS)
             self._publish_data()
 
-            time.sleep(2) # Setiap 2 detik evaluasi ulang
+            time.sleep(0.1) # TURBO MODE: Evaluasi setiap 100ms! Sangat responsif.
 
     def _evaluate_state(self):
+        current_time = time.time()
+        should_print = (current_time - self.last_print_time) >= 1.0 # Hanya print 1x per detik agar terminal tidak penuh
         # Prioritas Tertinggi: Impedansi (Safety)
         if self.impedance > 50000:
              print(f"[Shield] 🚨 IMPEDANSI TINGGI ({self.impedance} ohm). HARD CUT-OFF!")
@@ -86,20 +92,26 @@ class DecisionEngine:
                      self.serial.send_command("SET_CURRENT", 1.0)
                 self._trigger_ai("STRESS")
 
-        # Prioritas 2: EAR (Mengantuk)
-        elif self.current_ear < 0.22:
-            if self.current_state != "AWAKE_INTERVENTION":
-                print(f"[Shield] 🔴 AMIGDALA ALERT: EAR rendah ({self.current_ear}). MENGANTUK!")
-                self.current_state = "AWAKE_INTERVENTION"
-                self.lamp_intensity = 100
-                if self.serial:
-                     self.serial.send_command("SET_LIGHT", "#FFFFFF|100")
-                if self.mqtt_client and self.mqtt_client.connected:
-                     self.mqtt_client.client.publish("pandai/v1/actuator/light", "#FFFFFF|100")
-                self._trigger_ai("DROWSY")
-
-        # Prioritas 3: HRV (Fatigue)
-        elif self.current_hrv < 20:
+        # Prioritas 2: EAR (Mengantuk) / Tidak ada Wajah
+        elif self.current_ear < 0.24:  # Threshold dinaikkan agar lebih gampang memicu ngantuk
+            self.drowsy_frames_count += 1
+            
+            # Wajib terpejam minimal 8 frame (8 x 0.1s = 0.8 detik). Kalau cuma kedip (< 0.5 detik), diabaikan!
+            if self.drowsy_frames_count > 8: 
+                if self.current_state != "AWAKE_INTERVENTION":
+                    print(f"[Shield] 🔴 AMIGDALA ALERT: EAR sangat rendah / Mata terpejam ({self.current_ear}). MENGANTUK!")
+                    self.current_state = "AWAKE_INTERVENTION"
+                    self.lamp_intensity = 100
+                    if self.serial:
+                         self.serial.send_command("SET_LIGHT", "#FFFFFF|100")
+                    if self.mqtt_client and self.mqtt_client.connected:
+                         self.mqtt_client.client.publish("pandai/v1/actuator/light", "#FFFFFF|100")
+                    self._trigger_ai("DROWSY")
+        else:
+            self.drowsy_frames_count = 0 # RESET jika mata terbuka kembali
+            
+            # Prioritas 3: HRV (Fatigue)
+            if self.current_hrv < 20:
              if self.current_state != "FATIGUE":
                 print(f"[Shield] 🔴 AMIGDALA ALERT: HRV kritis ({self.current_hrv}). FATIGUE!")
                 self.current_state = "FATIGUE"
@@ -111,9 +123,12 @@ class DecisionEngine:
                 self._trigger_ai("FATIGUE")
 
         # Prioritas 4: Normal / Flow
-        else:
+        if self.current_state != "FLOW" and self.current_state != "AWAKE_INTERVENTION" and self.current_state != "HIGH_STRESS" and self.current_state != "FATIGUE":
+            pass # (fallback logic)
+        
+        elif self.current_ear >= 0.24 and self.current_hrv >= 20 and self.current_gsr <= (self.prev_gsr * 1.15):
             if self.current_state != "FLOW":
-                print(f"[Shield] 🟢 Kembali ke zona FLOW. EAR: {self.current_ear}, HRV: {self.current_hrv}")
+                print(f"[Shield] 🟢 Mata terbuka. EAR: {self.current_ear}. Kembali fokus ke zona FLOW.")
                 self.current_state = "FLOW"
                 self.lamp_intensity = 50
                 if self.serial:
@@ -121,6 +136,9 @@ class DecisionEngine:
                 if self.mqtt_client and self.mqtt_client.connected:
                      self.mqtt_client.client.publish("pandai/v1/actuator/light", "#E0F7FA|50")
                 self._trigger_ai("NORMAL")
+                
+        if should_print:
+             self.last_print_time = current_time
 
     def _publish_data(self):
         if not self.mqtt_client or not self.mqtt_client.connected:

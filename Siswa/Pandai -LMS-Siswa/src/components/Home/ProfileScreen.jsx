@@ -59,7 +59,7 @@ export default function ProfileScreen() {
           </div>
 
           {/* Alert Intervensi: Sekarang di dalam scrollable content, tidak menutupi navbar */}
-          {neuroData?.payload?.metrics?.ear_score < 0.22 && typeof neuroData?.payload?.metrics?.ear_score === 'number' && (
+          {neuroData?.payload?.metrics?.ear_score < 0.24 && typeof neuroData?.payload?.metrics?.ear_score === 'number' && (
             <div className='p-3 bg-orange-50 border border-orange-200 rounded-xl animate-pulse mb-4'>
               <p className='text-[11px] text-orange-700 font-bold flex items-center gap-2'>
                 <Eye size={14} /> Sistem mendeteksi kamu mengantuk. Segarkan dirimu!

@@ -6,8 +6,9 @@ export const useNeuroMqtt = () => {
     const [status, setStatus] = useState('OFFLINE');
 
     useEffect(() => {
-        // Sesuaikan host dengan IP Raspberry Pi atau Localhost Anda
-        const client = mqtt.connect('ws://localhost:9001');
+        // Dinamis mendeteksi IP/Host LMS agar mqtt websocket tidak putus
+        const wsUrl = typeof window !== 'undefined' ? `ws://${window.location.hostname}:9001` : 'ws://localhost:9001';
+        const client = mqtt.connect(wsUrl);
 
         client.on('connect', () => {
             setStatus('ONLINE');

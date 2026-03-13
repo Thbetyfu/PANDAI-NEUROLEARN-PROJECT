@@ -2,12 +2,15 @@ import cv2
 import mediapipe as mp
 import time
 from threading import Thread
+import collections
 
 class VisionEngine:
     def __init__(self, camera_index=0):
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(refine_landmarks=True)
         self.ear_score = 0.5
+        self.ear_history = collections.deque(maxlen=10) # Rata-rata 10 frame terakhir untuk kehalusan dan kecepatan
+        self.no_face_frames = 0
         self.is_running = False
         self.cap = None
         self.camera_index = camera_index
@@ -36,14 +39,29 @@ class VisionEngine:
     def _update(self):
         # Indeks landmark mata kiri/kanan MediaPipe
         LEFT_EYE = [33, 160, 158, 133, 153, 144]
+        RIGHT_EYE = [362, 385, 387, 263, 373, 380] # Tambahan presisi: Dua mata
+        
         while self.is_running:
             success, frame = self.cap.read()
             if success:
                 results = self.face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 if results.multi_face_landmarks:
+                    self.no_face_frames = 0
                     mesh = results.multi_face_landmarks[0].landmark
-                    self.ear_score = self._calculate_ear(mesh, LEFT_EYE)
-            time.sleep(0.03) # ~30 FPS
+                    
+                    # Hitung rata-rata 2 mata agar lebih akurat dibanding 1 sebelah saja
+                    left_ear = self._calculate_ear(mesh, LEFT_EYE)
+                    right_ear = self._calculate_ear(mesh, RIGHT_EYE)
+                    avg_ear = (left_ear + right_ear) / 2.0
+                    
+                    self.ear_history.append(avg_ear)
+                    # Smoothening result
+                    self.ear_score = sum(self.ear_history) / len(self.ear_history)
+                else:
+                    self.no_face_frames += 1
+                    if self.no_face_frames > 15: # Jika separuh detik tidak ada wajah
+                        self.ear_score = 0.0 # Force Drowsy / Alert System
+            time.sleep(0.02) # ~50 FPS internal throttle
 
     def get_ear(self) -> float:
         return round(self.ear_score, 3)

@@ -24,7 +24,8 @@ export function useNeuroListener() {
             console.log('[NeuroListener] Menghubungkan ke Broker Mosquitto (WebSocket port 9001)...');
 
             // Catatan: Browser hanya bisa MQTT via WebSockets
-            client = mqtt.connect('ws://localhost:9001');
+            const wsUrl = typeof window !== 'undefined' ? `ws://${window.location.hostname}:9001` : 'ws://localhost:9001';
+            client = mqtt.connect(wsUrl);
 
             client.on('connect', () => {
                 console.log('[NeuroListener] ✅ Terhubung ke MQTT Broker');
@@ -44,7 +45,7 @@ export function useNeuroListener() {
                         } else {
                             // Fallback mapping if 'state' wasn't present
                             if (metrics.hrv_rmssd_ms < 20) setNeuroState('FATIGUE');
-                            else if (metrics.ear_score < 0.22) setNeuroState('DROWSY');
+                            else if (metrics.ear_score < 0.24) setNeuroState('DROWSY');
                             else setNeuroState('NORMAL');
                         }
                     }
