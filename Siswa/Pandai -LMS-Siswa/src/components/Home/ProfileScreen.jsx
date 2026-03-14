@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Activity, Brain, Eye } from 'lucide-react';
+import { Copy, Activity, Brain, Eye, Camera, TrendingUp, Smile, UserCheck, MapPin } from 'lucide-react';
 import { useNeuroMqtt } from '../../hooks/useNeuroMqtt';
 import { useNeuroListener } from '@/hooks/useNeuroListener';
 
@@ -42,19 +42,152 @@ export default function ProfileScreen() {
           </div>
 
           <div className='grid grid-cols-2 gap-3 mb-4'>
-            <div className='bg-[#F8FAFF] p-4 rounded-2xl'>
+            <div className='bg-linear-to-br from-[#F8FAFF] to-[#E2EBFF] p-4 rounded-2xl border border-white/50 shadow-sm'>
               <Brain size={20} className='text-blue-600 mb-2' />
-              <p className='text-[10px] text-gray-500 font-medium'>Skor Fokus</p>
-              <p className='text-xl font-bold text-blue-700'>
-                {((neuroData?.payload?.metrics?.attention_index || neuroData?.payload?.metrics?.ear_score || 0) * 100).toFixed(0)}%
+              <p className='text-[10px] text-gray-500 font-medium uppercase tracking-wider'>Focus Index</p>
+              <p className='text-2xl font-black text-blue-700'>
+                {((neuroData?.payload?.metrics?.attention_index || 0) * 100).toFixed(0)}%
               </p>
             </div>
-            <div className='bg-[#FDF8FF] p-4 rounded-2xl'>
+            <div className='bg-linear-to-br from-[#FDF8FF] to-[#F3E8FF] p-4 rounded-2xl border border-white/50 shadow-sm'>
               <Activity size={20} className='text-purple-600 mb-2' />
-              <p className='text-[10px] text-gray-500 font-medium'>Beban Kerja</p>
-              <p className='text-xl font-bold text-purple-700'>
+              <p className='text-[10px] text-gray-500 font-medium uppercase tracking-wider'>Beban Kerja</p>
+              <p className='text-2xl font-black text-purple-700'>
                 {neuroData?.payload?.metrics?.cognitive_load || 0}%
               </p>
+            </div>
+          </div>
+
+          {/* Bagian Baru: Statistik Kesejahteraan & Tren */}
+          <div className='mt-8 pt-8 border-t border-gray-100'>
+            <div className='flex items-center gap-2 mb-4'>
+              <TrendingUp size={20} className='text-blue-600' />
+              <h3 className='font-bold text-[#1D115A] text-lg'>Tren Kesejahteraan Biometrik</h3>
+            </div>
+
+            <div className='bg-linear-to-br from-[#F8FAFF] to-white p-4 rounded-3xl border border-blue-50 mb-6'>
+              <p className='text-[10px] text-gray-500 font-medium uppercase mb-4'>Heart Rate Variability (HRV) - 7 Hari Terakhir</p>
+              {/* Mini Chart Mockup (SVG) */}
+              <div className="w-full h-24 mb-2 flex items-end gap-1">
+                {[40, 65, 45, 80, 55, 90, 75].map((h, i) => (
+                  <div key={i} className="flex-1 bg-blue-100 rounded-t-lg relative group">
+                    <div
+                      className="absolute bottom-0 w-full bg-blue-500 rounded-t-lg transition-all duration-1000"
+                      style={{ height: `${h}%` }}
+                    ></div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[8px] text-gray-400 font-bold uppercase">
+                <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+              </div>
+            </div>
+
+            {/* Visual Monitoring (Kamera) - Sekarang berada persis di bawah Tren */}
+            <div className='mb-6'>
+              <div className="flex items-center justify-between mb-3 px-1">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full ${neuroData?.payload?.metrics?.face_detected ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+                  Visual Monitoring (Kamera)
+                </h4>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                  {neuroData?.payload?.metrics?.face_detected ? 'FACE DETECTED' : 'FACE NOT FOUND'}
+                </span>
+              </div>
+
+              <div className='bg-white border border-gray-100 p-4 rounded-2xl relative overflow-hidden shadow-xs'>
+                {/* Decorative Camera Icon */}
+                <Camera size={48} className="absolute -right-2 -bottom-2 text-gray-100/50" />
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-end mb-2">
+                    <div>
+                      <p className='text-[10px] text-gray-500 font-medium'>Raut Wajah (EAR Score)</p>
+                      <p className='text-2xl font-black text-[#1D115A]'>{neuroData?.payload?.metrics?.ear_score || 0.00}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className='text-[10px] text-gray-500 font-medium text-right'>Analisis Statistik</p>
+                      <p className={`text-[12px] font-bold ${neuroData?.payload?.metrics?.face_detected ? 'text-green-600' : 'text-gray-400'}`}>
+                        {neuroData?.payload?.metrics?.face_detected ? 'Kualitas Prima' : 'Sensor Standby'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${neuroData?.payload?.metrics?.ear_score < 0.24 ? 'bg-orange-500' : 'bg-blue-500'}`}
+                      style={{ width: `${Math.min(100, (neuroData?.payload?.metrics?.ear_score || 0) * 200)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-2 italic font-medium">Sinkronisasi Real-time dengan Neuro-Engine Aktif.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* FITUR BARU: Tren Citra Anak (Emotion & Gaze) */}
+            <div className='mt-8 pt-8 border-t border-gray-100'>
+              <div className='flex items-center gap-2 mb-4'>
+                <UserCheck size={20} className='text-purple-600' />
+                <h3 className='font-bold text-[#1D115A] text-lg'>Tren Citra Anak</h3>
+              </div>
+
+              <div className='grid grid-cols-2 gap-3 mb-6'>
+                {/* Emotion Status Card */}
+                <div className='bg-[#FDF8FF] border border-purple-50 p-4 rounded-3xl relative overflow-hidden'>
+                  <Smile size={32} className="absolute -right-1 -top-1 text-purple-100/50" />
+                  <p className='text-[10px] text-gray-500 font-bold uppercase mb-1'>Mood Analysis</p>
+                  <p className='text-xl font-black text-purple-800'>
+                    {neuroData?.payload?.metrics?.emotion || "NEUTRAL"}
+                  </p>
+                  <div className='mt-2 flex items-center gap-1'>
+                    <div className='w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse'></div>
+                    <span className='text-[8px] font-bold text-purple-400 uppercase tracking-tighter'>Emotion Sync Active</span>
+                  </div>
+                </div>
+
+                {/* Gaze/Heatmap Stats Card */}
+                <div className='bg-[#F8FAFF] border border-blue-50 p-4 rounded-3xl relative overflow-hidden'>
+                  <MapPin size={32} className="absolute -right-1 -top-1 text-blue-100/50" />
+                  <p className='text-[10px] text-gray-500 font-bold uppercase mb-1'>Attention Focus</p>
+                  <p className='text-xl font-black text-blue-800 uppercase'>
+                    {neuroData?.payload?.metrics?.gaze_coords?.x > 0.4 && neuroData?.payload?.metrics?.gaze_coords?.x < 0.6 ? "On Target" : "Distracted"}
+                  </p>
+                  <p className='text-[8px] font-medium text-gray-400'>Coord: {neuroData?.payload?.metrics?.gaze_coords?.x}, {neuroData?.payload?.metrics?.gaze_coords?.y}</p>
+                </div>
+              </div>
+
+              {/* Attention Heatmap Visualization (Offloaded to Dashboard) */}
+              <div className='bg-gray-950 p-6 rounded-[2rem] relative overflow-hidden aspect-video border-[6px] border-white shadow-xl'>
+                <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 to-transparent'></div>
+
+                {/* The "Heat" Point - Dynamically positioned via MQTT coordinates */}
+                <div
+                  className="absolute w-24 h-24 bg-blue-500/40 rounded-full blur-2xl transition-all duration-500 ease-out"
+                  style={{
+                    left: `${(neuroData?.payload?.metrics?.gaze_coords?.x || 0.5) * 100}%`,
+                    top: `${(neuroData?.payload?.metrics?.gaze_coords?.y || 0.5) * 100}%`,
+                    transform: 'translate(-50%, -50%)'
+                  }}
+                ></div>
+
+                <div
+                  className="absolute w-4 h-4 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,0.8)] transition-all duration-300"
+                  style={{
+                    left: `${(neuroData?.payload?.metrics?.gaze_coords?.x || 0.5) * 100}%`,
+                    top: `${(neuroData?.payload?.metrics?.gaze_coords?.y || 0.5) * 100}%`,
+                    transform: 'translate(-50%, -50%)'
+                  }}
+                ></div>
+
+                <div className="absolute bottom-4 left-6 right-6 flex justify-between items-center text-white/40">
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Live Attention Heatmap</span>
+                  <div className="flex gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+                  </div>
+                </div>
+              </div>
+              <p className='text-[9px] text-gray-400 mt-3 text-center italic'>Dashboard memproses data koordinat pupil secara ringan untuk akurasi monitor.</p>
             </div>
           </div>
 

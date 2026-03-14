@@ -15,8 +15,9 @@ FONT_HEADING = "Plus Jakarta Sans"
 FONT_INTER = "Inter"
 
 class StatistikPage(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, engine=None, **kwargs):
         super().__init__(master, corner_radius=0, fg_color="transparent", **kwargs)
+        self.engine = engine
         
         # 1. Main Scrollable Area
         self.scroll_frame = ctk.CTkScrollableFrame(
@@ -36,7 +37,10 @@ class StatistikPage(ctk.CTkFrame):
         # --- ROW 2: AREA CHART HRV ---
         self.setup_hrv_row()
 
-        # --- ROW 3: SESSION LOG TABLE ---
+        # --- ROW 3: TREN CITRA ANAK (EMOTION & GAZE) ---
+        self.setup_citra_anak_row()
+
+        # --- ROW 4: SESSION LOG TABLE ---
         self.setup_table_row()
 
     def setup_top_row(self):
@@ -330,6 +334,102 @@ class StatistikPage(ctk.CTkFrame):
 
             # 4. Skor
             ctk.CTkLabel(r, text=sc, width=194, font=ctk.CTkFont(family=FONT_INTER, size=14, weight="bold"), text_color="#334155", anchor="w").pack(side="left", padx=24)
+
+    def setup_citra_anak_row(self):
+        # 1. Container Row
+        row_citra = ctk.CTkFrame(self.inner, fg_color="transparent")
+        row_citra.pack(fill="x", pady=(0, 32))
+        
+        # Header
+        head = ctk.CTkFrame(row_citra, fg_color="transparent")
+        head.pack(fill="x", padx=24, pady=(0, 24))
+        
+        info = ctk.CTkFrame(head, fg_color="transparent")
+        info.pack(side="left")
+        ctk.CTkLabel(info, text="Tren Citra Anak", font=ctk.CTkFont(family=FONT_INTER, size=18, weight="bold"), text_color=COLOR_TEXT_DARK).pack(anchor="w")
+        ctk.CTkLabel(info, text="Analisis visual emosi dan fokus pandangan mata (Gaze Tracking)", font=ctk.CTkFont(family=FONT_INTER, size=14), text_color=COLOR_TEXT_SUB).pack(anchor="w")
+
+        # 2. Main Content (Vertical stacked layout)
+        content = ctk.CTkFrame(row_citra, fg_color="transparent")
+        content.pack(fill="x", padx=16)
+
+        # Top Section: Emotion & Focus Cards (Horizontal pair inside top section)
+        top_stats = ctk.CTkFrame(content, fg_color="transparent")
+        top_stats.pack(fill="x", pady=(0, 16))
+
+        # Emotion Card
+        self.emotion_card = ctk.CTkFrame(top_stats, fg_color=COLOR_WHITE, corner_radius=12, border_width=1, border_color=COLOR_BORDER, height=140)
+        self.emotion_card.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        self.emotion_card.pack_propagate(False)
+        
+        ctk.CTkLabel(self.emotion_card, text="STATUS EMOSI REAL-TIME", font=ctk.CTkFont(size=10, weight="bold"), text_color=COLOR_TEXT_SUB).pack(anchor="w", padx=24, pady=(20, 0))
+        self.emotion_val = ctk.CTkLabel(self.emotion_card, text="NEUTRAL", font=ctk.CTkFont(family=FONT_HEADING, size=32, weight="bold"), text_color=COLOR_BRAND_BLUE)
+        self.emotion_val.pack(anchor="w", padx=24)
+        
+        self.emotion_sync_label = ctk.CTkLabel(self.emotion_card, text="● SYNCED WITH VISION ENGINE", font=ctk.CTkFont(size=9, weight="bold"), text_color="#10B981")
+        self.emotion_sync_label.pack(anchor="w", padx=24, pady=(2, 0))
+
+        # Focus Status Card
+        self.focus_card = ctk.CTkFrame(top_stats, fg_color=COLOR_WHITE, corner_radius=12, border_width=1, border_color=COLOR_BORDER, height=140)
+        self.focus_card.pack(side="left", fill="both", expand=True, padx=(8, 0))
+        self.focus_card.pack_propagate(False)
+
+        ctk.CTkLabel(self.focus_card, text="KONSISTENSI FOKUS VISUAL", font=ctk.CTkFont(size=10, weight="bold"), text_color=COLOR_TEXT_SUB).pack(anchor="w", padx=24, pady=(20, 0))
+        self.focus_status = ctk.CTkLabel(self.focus_card, text="ON TARGET", font=ctk.CTkFont(family=FONT_HEADING, size=24, weight="bold"), text_color="#8B5CF6")
+        self.focus_status.pack(anchor="w", padx=24)
+
+        # Bottom Section: Live Attention Heatmap (Expanded below)
+        right_col = ctk.CTkFrame(content, fg_color="#0F172A", corner_radius=24, height=350)
+        right_col.pack(side="top", fill="x", pady=(8, 0))
+        right_col.pack_propagate(False)
+
+        ctk.CTkLabel(right_col, text="LIVE ATTENTION HEATMAP", font=ctk.CTkFont(size=10, weight="bold"), text_color="white").pack(anchor="w", padx=24, pady=(24, 0))
+        
+        # Heatmap Canvas
+        self.heatmap_canvas = tk.Canvas(right_col, bg="#0F172A", highlightthickness=0)
+        self.heatmap_canvas.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Initial Heat Element
+        self.heat_glow = self.heatmap_canvas.create_oval(0, 0, 0, 0, fill="#330DF2", outline="", stipple="gray50") # Mock glow
+        self.heat_point = self.heatmap_canvas.create_oval(0, 0, 0, 0, fill="white", outline="")
+
+        # Disclaimer
+        ctk.CTkLabel(row_citra, text="Akurasi heatmap bergantung pada kalibrasi pencahayaan ruangan dan posisi duduk anak.", font=ctk.CTkFont(size=10, slant="italic"), text_color=COLOR_TEXT_SUB).pack(pady=(12, 0))
+
+    def update_realtime(self):
+        """Metode update UI real-time dengan Exception Guard"""
+        try:
+            if self.engine and self.engine.vision:
+                # 1. Get Data from Vision Engine
+                citra_data = self.engine.vision.get_citra_anak()
+                emotion = citra_data.get("emotion", "NEUTRAL")
+                gaze = citra_data.get("gaze_coords", {"x": 0.5, "y": 0.5})
+                
+                # 2. Update Emotion Text
+                self.emotion_val.configure(text=emotion)
+                
+                # 3. Update Focus Status
+                is_focused = 0.4 < gaze["x"] < 0.6
+                self.focus_status.configure(
+                    text="ON TARGET" if is_focused else "DISTRACTED",
+                    text_color="#8B5CF6" if is_focused else "#F43F5E"
+                )
+                
+                # 4. Update Heatmap Position
+                cw = self.heatmap_canvas.winfo_width()
+                ch = self.heatmap_canvas.winfo_height()
+                
+                if cw > 1 and ch > 1:
+                    hx = gaze["x"] * cw
+                    hy = gaze["y"] * ch
+                    self.heatmap_canvas.coords(self.heat_glow, hx-40, hy-40, hx+40, hy+40)
+                    self.heatmap_canvas.coords(self.heat_point, hx-5, hy-5, hx+5, hy+5)
+        except Exception as e:
+            print(f"[StatistikUI] Exception in real-time loop: {e}")
+            # Silently recover for UI but log it
+
+        # Loop every 100ms
+        self.after(100, self.update_realtime)
 
     def draw_radar(self, canvas):
         cx, cy = 128, 128

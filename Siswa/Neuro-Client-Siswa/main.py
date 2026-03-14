@@ -1,6 +1,9 @@
 import customtkinter as ctk
 import os
 import tkinter as tk
+import sys
+
+from core.decision_engine import DecisionEngine, PandaiCriticalError, VisionCriticalError, SerialCriticalError, MQTTConnectionCriticalError
 
 # Import Components
 from components.sidebar import SidebarFrame
@@ -31,6 +34,9 @@ class NeuroClientApp(ctk.CTk):
         self.title("PANDAI Neuro-Client 2.0")
         self.geometry("1440x1024")
         self.configure(fg_color=COLOR_APP_BG)
+
+        # Integrity Tracking
+        self.security_token = False
 
         # App State
         self.user_name = "Mozart"
@@ -67,7 +73,7 @@ class NeuroClientApp(ctk.CTk):
         # 5. INITIALIZE PAGES
         self.pages = {
             "Beranda": BerandaPage(self.view_container),
-            "Statistik Anda": StatistikPage(self.view_container),
+            "Statistik Anda": StatistikPage(self.view_container, engine=None), # Will be set after init_core
             "Profil Anda": ProfilPage(self.view_container),
             "Debug": DebugDisplayPage(self.view_container)
         }
@@ -86,13 +92,68 @@ class NeuroClientApp(ctk.CTk):
         self.bind("<Configure>", self.on_window_resize)
 
         # 7. INIT BACKGROUND SYSTEMS
-        self.init_core_systems()
+        try:
+             self.init_core_systems()
+             self.run_integrity_check()
+             # If we get here, hardware is verified!
+             self.security_token = True
+             self.select_page("Beranda")
+        except (PandaiCriticalError, Exception) as e:
+             self.show_panic_screen(str(e))
+             return
 
-        # Start with Beranda
-        self.select_page("Beranda")
+        # Final Status
+        print("="*60)
+        print("  Core Systems: INITIALIZED & ONLINE")
+        print("="*60)
 
-        # Cleanup on exit
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+    def run_integrity_check(self):
+        """Medical Grade Safety Loop: Verifikasi keberadaan sensor vital."""
+        # 1. Cek Vision System
+        if not self.vision or not self.vision.is_running:
+            raise VisionCriticalError("Kamera Siswa tidak terdeteksi atau rusak. Aplikasi dihentikan demi akurasi data.")
+            
+        # 2. Cek Serial Hardware (ESP32)
+        # Note: Port=None is for simulation, but in production this is a CRITICAL ERROR
+        if not self.serial or not self.serial.connected:
+            raise SerialCriticalError("Sensor GSR/HRV (ESP32) tidak terdeteksi. Pastikan kabel USB terpasang.")
+            
+        # 3. Cek MQTT Cloud
+        if not self.mqtt or not self.mqtt.connected:
+             # Rekoneksi singkat sebelum menyerah
+             time.sleep(1) 
+             if not self.mqtt.connected:
+                raise MQTTConnectionCriticalError("Koneksi Cloud (EMQX) gagal. Sistem intervensi tidak bisa berjalan.")
+
+    def show_panic_screen(self, message):
+        """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""
+        panic_overlay = ctk.CTkFrame(self, fg_color="#F43F5E", corner_radius=0)
+        panic_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        panic_overlay.lift()
+
+        # Disable all background interaction
+        self.sidebar.nav_frame.grid_remove() # Hilangkan menu navigasi
+        
+        container = ctk.CTkFrame(panic_overlay, fg_color="transparent")
+        container.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(container, text="🚨 SYSTEM PANIC 🚨", font=ctk.CTkFont(size=48, weight="bold"), text_color="white").pack(pady=20)
+        ctk.CTkLabel(container, text="PROTEKSI INTEGRITAS KOGNITIF AKTIF", font=ctk.CTkFont(size=20, weight="bold"), text_color="#FFD1D8").pack()
+        
+        error_box = ctk.CTkFrame(container, fg_color="#991B1B", corner_radius=16)
+        error_box.pack(pady=40, padx=20, fill="both")
+        
+        ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(size=18), text_color="white", wraplength=500, justify="center", padx=30, pady=30).pack()
+
+        ctk.CTkLabel(container, text="Sistem PANDAI menolak berjalan tanpa validasi hardware yang aman.", font=ctk.CTkFont(size=14, slant="italic"), text_color="white").pack()
+        
+        btn_fix = ctk.CTkButton(
+            container, text="Keluarkankan Aplikasi & Periksa Kabel", 
+            fg_color="white", text_color="#F43F5E", hover_color="#F1F5F9",
+            height=50, font=ctk.CTkFont(weight="bold"),
+            command=self.on_closing
+        )
+        btn_fix.pack(pady=40)
 
     def init_core_systems(self):
         print("="*60)
@@ -100,39 +161,39 @@ class NeuroClientApp(ctk.CTk):
         print("="*60)
 
         # 1. MQTT (The Bridge to Dashboard)
-        # Menggunakan Public/External Broker karena tidak ada Mosquitto lokal
         self.mqtt = MQTTClient(broker_host="broker.emqx.io", broker_port=1883)
         self.mqtt.connect()
+        # Give a small time for MQTT connect
+        time.sleep(0.5)
 
         # 2. Serial Client (The Bridge to ESP32)
-        self.serial = SerialClient(port=None)  # None = tidak ada ESP32 tercolok
-        # Uncomment dan ganti port untuk koneksi real:
-        # self.serial = SerialClient(port="COM3", baudrate=115200)
-        # self.serial.connect()
+        # Sesuai rule PKM: Wajib mendeteksi hardware fisik
+        self.serial = SerialClient(port=None) 
 
         # 3. Vision Engine (The Eyes — EAR via Kamera)
         self.vision = VisionEngine(camera_index=0)
-        vision_ok = self.vision.start()
-        if not vision_ok:
-            print("[Main] Kamera tidak tersedia. Fallback ke simulasi EAR.")
-            self.vision = None
+        self.vision.start()
 
         # 4. Local AI (Ollama)
-        self.ai_client = LocalAIClient(host="localhost", port=11434, model="gemma2:2b")
+        try:
+            self.ai_client = LocalAIClient(host="localhost", port=11434, model="gemma2:2b")
+        except:
+             self.ai_client = None
 
         # 5. Decision Engine (The Brain — Amigdala Shield)
         self.engine = DecisionEngine(
             mqtt_client=self.mqtt,
-            serial_client=self.serial if self.serial.connected else None,
+            serial_client=self.serial if (self.serial and self.serial.connected) else None,
             ai_client=self.ai_client,
             vision_engine=self.vision,
             mode="hybrid",
         )
         self.engine.start()
 
-        print("="*60)
-        print("  Core Systems: ONLINE")
-        print("="*60)
+        # Inject engine to Stat page and start update loop
+        if "Statistik Anda" in self.pages:
+            self.pages["Statistik Anda"].engine = self.engine
+            self.pages["Statistik Anda"].update_realtime()
 
     def on_closing(self):
         print("Tutup app, mematikan semua sistem...")

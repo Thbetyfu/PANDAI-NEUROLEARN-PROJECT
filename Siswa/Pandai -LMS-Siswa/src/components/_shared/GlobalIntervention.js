@@ -1,13 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useNeuroListener } from '@/hooks/useNeuroListener';
+import { Camera, Brain, Lock, RefreshCcw, WifiOff } from 'lucide-react';
+import PanicOverlay from '../Common/PanicOverlay';
 
 export default function GlobalIntervention({ children }) {
-    const { neuroState, isSimulating, setIsSimulating, triggerSimulation } = useNeuroListener();
+    const { neuroState, bioData, isSimulating, setIsSimulating, triggerSimulation, isConnected } = useNeuroListener();
     const router = useRouter();
 
     const [showPopup, setShowPopup] = useState(false);
     const [popupContent, setPopupContent] = useState(null);
+    const [isFaceLocked, setIsFaceLocked] = useState(false);
+    const [faceTimer, setFaceTimer] = useState(10); // Countdown 10 detik
+
+    // LOGIKA MANDATORY CAMERA (Hard Lock 10 Detik)
+    useEffect(() => {
+        let interval = null;
+
+        // Cek status deteksi wajah dari bioData (didapat dari Neuro-Client Python via MQTT)
+        const isFaceDetected = bioData?.face_detected;
+
+        if (!isFaceDetected && !isSimulating) {
+            // Wajah Hilang: Mulai hitung mundur
+            interval = setInterval(() => {
+                setFaceTimer((prev) => {
+                    if (prev <= 1) {
+                        setIsFaceLocked(true);
+                        clearInterval(interval);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else {
+            // Wajah Kembali: Lepaskan kunci dan reset timer
+            setIsFaceLocked(false);
+            setFaceTimer(10);
+            if (interval) clearInterval(interval);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [bioData?.face_detected, isSimulating]);
 
     // Mapping logic: DROWSY, HIGH_STRESS, FATIGUE, NORMAL
     useEffect(() => {
@@ -59,6 +94,14 @@ export default function GlobalIntervention({ children }) {
 
     return (
         <>
+            {/* INTEGRITY GUARD: Panic Overlay if MQTT Disconnected or Data Lost and not simulating */}
+            {!isConnected && !isSimulating && (
+                <PanicOverlay
+                    errorType="MQTTConnectionCriticalError"
+                    message="Koneksi ke Jalur Saraf (Cloud Broker) terputus. Sistem intervensi tidak dapat menjamin validitas data kognitif Anda."
+                />
+            )}
+
             <div className={`relative min-h-screen ${showPopup && popupContent?.type === 'HIGH_STRESS' ? 'opacity-20 pointer-events-none overflow-hidden' : ''}`}>
                 {children}
             </div>
@@ -84,12 +127,55 @@ export default function GlobalIntervention({ children }) {
             )}
 
             {/* Badge Normal / Focused */}
-            {(neuroState === 'NORMAL' || neuroState === 'FLOW') && (
+            {(neuroState === 'NORMAL' || neuroState === 'FLOW') && !isFaceLocked && (
                 <div className="fixed top-4 right-4 z-[9990] bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold shadow-md animate-pulse">
                     Fokusmu luar biasa! Pertahankan 🔥
                 </div>
             )}
 
+            {/* HARD LOCK OVERLAY (Face Detection Missing) */}
+            {(faceTimer < 5 || isFaceLocked) && !isSimulating && (
+                <div className={`fixed inset-0 z-[10000] flex items-center justify-center transition-all duration-500 ${isFaceLocked ? 'bg-black/90 backdrop-blur-xl' : 'bg-orange-600/20 backdrop-blur-sm'}`}>
+                    <div className="bg-white/10 border border-white/20 p-10 rounded-[32px] shadow-2xl max-w-lg w-full text-center backdrop-blur-md">
+                        <div className="relative mb-8 flex justify-center">
+                            <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+                                <Camera size={48} className="text-white" />
+                            </div>
+                            <div className="absolute -top-2 -right-2 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center border-4 border-white">
+                                <Lock size={16} className="text-white" />
+                            </div>
+                        </div>
+
+                        <h2 className="text-3xl font-black text-white mb-4 tracking-tight">KONTROL KAMERA AKTIF</h2>
+
+                        {!isFaceLocked ? (
+                            <div className="space-y-4">
+                                <p className="text-white/80 text-lg leading-relaxed">
+                                    PANDAI Shield tidak mendeteksi kehadiranmu. Keamanan belajar akan terkunci dalam:
+                                </p>
+                                <div className="text-6xl font-black text-white animate-bounce">
+                                    {faceTimer}s
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                <p className="text-white/80 text-lg leading-relaxed">
+                                    Sesi belajar ditangguhkan demi keamanan dan akurasi data. <br />
+                                    <strong>Mohon aktifkan kamera Laptop Anda dan posisikan wajah di depan layar.</strong>
+                                </p>
+                                <div className="flex items-center justify-center gap-3 py-4 bg-white/10 rounded-2xl border border-white/5">
+                                    <RefreshCcw size={20} className="text-white animate-spin" />
+                                    <span className="text-white font-bold uppercase tracking-widest text-xs">Menunggu Sinyal Neuro-Client...</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-8 pt-8 border-t border-white/10">
+                            <p className="text-white/50 text-[10px] uppercase font-bold tracking-widest">PANDAI NeuroLearn Security Protocol v2.2</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

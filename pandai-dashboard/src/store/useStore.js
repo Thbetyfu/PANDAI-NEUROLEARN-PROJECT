@@ -9,6 +9,9 @@ export const usePandaiStore = create((set) => ({
     },
     biometricsHistory: [],
     interventionLogs: [],
+    isConnected: false,
+
+    setIsConnected: (connected) => set({ isConnected: connected }),
 
     setBiometrics: (newData) => set((state) => ({
         liveBiometrics: { ...state.liveBiometrics, ...newData }

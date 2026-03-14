@@ -5,14 +5,17 @@ export function useNeuroListener() {
     const [neuroState, setNeuroState] = useState('NORMAL');
     const [bioData, setBioData] = useState(null);
     const [isSimulating, setIsSimulating] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
     const simTimer = useRef(null);
 
     useEffect(() => {
         let client = null;
+        let isMounted = true;
 
         if (isSimulating) {
             // MODE SIMULASI: Dummy data yang berubah-ubah untuk demo tanpa alat
             console.log('[NeuroListener] Mode Simulasi Aktif');
+            setIsConnected(true);
 
             let idx = 0;
             simTimer.current = setInterval(() => {
@@ -28,11 +31,14 @@ export function useNeuroListener() {
             client = mqtt.connect(wsUrl);
 
             client.on('connect', () => {
+                if (!isMounted || client.disconnecting) return;
                 console.log('[NeuroListener] ✅ Terhubung ke MQTT Broker');
+                setIsConnected(true);
                 client.subscribe('pandai/v1/bio/processed');
             });
 
             client.on('message', (topic, message) => {
+                if (!isMounted) return;
                 try {
                     const payload = JSON.parse(message.toString());
                     if (payload.payload && payload.payload.metrics) {
@@ -54,14 +60,22 @@ export function useNeuroListener() {
                 }
             });
 
+            client.on('close', () => {
+                if (isMounted) setIsConnected(false);
+            });
+
             client.on('error', (err) => {
+                if (!isMounted) return;
                 console.error('[NeuroListener] ❌ MQTT Connection Error:', err);
             });
         }
 
         return () => {
+            isMounted = false;
             if (simTimer.current) clearInterval(simTimer.current);
-            if (client) client.end();
+            if (client) {
+                client.end(true); // force close
+            }
         };
     }, [isSimulating]);
 
@@ -72,5 +86,5 @@ export function useNeuroListener() {
         console.log(`[NeuroListener] Trigger Simulasi: ${stateName}`);
     };
 
-    return { neuroState, bioData, isSimulating, setIsSimulating, triggerSimulation };
+    return { neuroState, bioData, isSimulating, setIsSimulating, triggerSimulation, isConnected };
 }
