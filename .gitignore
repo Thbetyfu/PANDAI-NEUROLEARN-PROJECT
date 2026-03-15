@@ -49,3 +49,8 @@ next-env.d.ts
 # Python cache
 __pycache__/
 *.pyc
+
+# Local Data Storage (Medical Sensitivity)
+*.db
+*.sqlite3
+db/

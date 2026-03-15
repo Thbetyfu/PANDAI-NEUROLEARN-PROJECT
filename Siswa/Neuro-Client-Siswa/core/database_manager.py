@@ -1,75 +1,91 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class DatabaseManager:
     """
-    Manajemen Persistensi Data PANDAI (Persistence Layer).
+    Manajemen Persistensi Data PANDAI (Memori Lokal).
     Menyimpan log kognitif dan riwayat intervensi ke dalam SQLite lokal.
     """
-    def __init__(self, db_path="db/neuro_data.db"):
+    def __init__(self, db_path="db/local_memory.db"):
+        """Inisialisasi koneksi ke SQLite."""
         self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        """Inisialisasi tabel jika belum ada."""
+        # Pastikan folder db ada
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self._init_tables()
+
+    def _init_tables(self):
+        """Membuat tabel jika belum ada."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        # Tabel 1: Session Logs (Data Biometrik & Kognitif)
+
+        # Tabel Log Biometrik (Disimpan per interval 5 detik)
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS session_logs (
+            CREATE TABLE IF NOT EXISTS biometric_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT,
-                timestamp DATETIME,
-                focus_index REAL,
-                gsr_value REAL,
-                hrv_value REAL,
-                emotion TEXT,
-                state TEXT
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ear_score REAL,
+                attention_index REAL,
+                cognitive_load REAL,
+                emotion_state TEXT
             )
         ''')
-        
-        # Tabel 2: Intervention History (tDCS, Lampu, Audio)
+
+        # Tabel Log Intervensi & AI
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS intervention_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT,
-                timestamp DATETIME,
-                type TEXT,
-                action TEXT,
-                value REAL
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                trigger_reason TEXT,
+                action_taken TEXT
             )
         ''')
-        
+
         conn.commit()
         conn.close()
+        print(f"[DATABASE] ✅ Memori Lokal Siap ({self.db_path})")
 
-    def save_log(self, session_id, focus, gsr, hrv, emotion, state):
-        """Simpan detak data biometrik siswa."""
+    def insert_biometric_log(self, ear, attention, load, emotion="NORMAL"):
+        """Menyimpan data ringkasan ke database."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO session_logs (session_id, timestamp, focus_index, gsr_value, hrv_value, emotion, state)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (session_id, datetime.now().isoformat(), focus, gsr, hrv, emotion, state))
+                INSERT INTO biometric_logs (ear_score, attention_index, cognitive_load, emotion_state)
+                VALUES (?, ?, ?, ?)
+            ''', (ear, attention, load, emotion))
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[DB] Error saving log: {e}")
+            print(f"[DATABASE] ⚠️ Gagal menyimpan log: {e}")
 
-    def save_intervention(self, session_id, inter_type, action, value=0.0):
-        """Catat setiap kali ada intervensi tDCS atau hardware lainnya."""
+    def log_intervention(self, reason, action):
+        """Mencatat kapan sistem memberikan intervensi."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO intervention_history (session_id, timestamp, type, action, value)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (session_id, datetime.now().isoformat(), inter_type, action, value))
+                INSERT INTO intervention_history (trigger_reason, action_taken)
+                VALUES (?, ?)
+            ''', (reason, action))
             conn.commit()
             conn.close()
+            print(f"[DATABASE] ⚡ Intervensi Dicatat: {reason} -> {action}")
         except Exception as e:
-            print(f"[DB] Error saving intervention: {e}")
+            print(f"[DATABASE] ⚠️ Gagal menyimpan intervensi: {e}")
+
+    def clean_old_data(self, days=30):
+        """Menghapus data yang lebih tua dari X hari untuk menghemat memori."""
+        try:
+            cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM biometric_logs WHERE timestamp < ?', (cutoff_date,))
+            deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            if deleted > 0:
+                print(f"[DATABASE] 🧹 Membersihkan {deleted} baris data lama.")
+        except Exception as e:
+            print(f"[DATABASE] 🧹 Cleanup error: {e}")
+            pass

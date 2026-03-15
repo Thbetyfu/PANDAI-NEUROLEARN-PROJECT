@@ -27,10 +27,15 @@ class DecisionEngine:
         
         # New: Persistence Layer (SQLite)
         self.db = DatabaseManager()
+        self.data_buffer = []
+        self.last_db_save = time.time()
+        self.db_save_interval = 5.0 # Simpan setiap 5 detik
         
         # New: System Context
         self.serial = serial_client
         self.mqtt = mqtt_client
+        self.ai_client = ai_client # Ensure AI client is assigned
+        self.vision = vision_engine # Ensure vision engine is assigned
 
         # Security & Integrity Status
         self.is_healthy = True
@@ -67,6 +72,11 @@ class DecisionEngine:
     def start(self):
         print(f"[Engine] 🧠 Neuro-Architect Protocol Berjalan (Sesi: {self.session_id})")
         self.running = True
+        
+        # [SECURITY] Bersihkan data lama (> 30 hari) saat startup
+        print("[Engine] 🧹 Memeriksa dan membersihkan memori lama...")
+        self.db.clean_old_data(days=30)
+        
         if self.vision and not self.vision.is_running:
             self.vision.start()
         threading.Thread(target=self._run_loop, daemon=True).start()
@@ -113,8 +123,8 @@ class DecisionEngine:
                 # 4. Telemetry (Fast response 10fps)
                 self._publish_telemetry()
 
-                # 5. Persistence (Slow log 1fps to save SD Card/Disk)
-                self._handle_persistence()
+                # 5. Intelligent Buffer (Averaging every 5 seconds)
+                self._handle_buffering()
 
             except PandaiCriticalError as e:
                 print(f"[Engine] Runtime Critical Error: {e}")
@@ -229,8 +239,8 @@ class DecisionEngine:
         if self.mqtt_client and self.mqtt_client.connected:
             self.mqtt_client.client.publish("pandai/v1/actuator/light", lamp_cmd)
             
-        # Log to Database
-        self.db.save_intervention(self.session_id, "SYSTEM_STATE", state, tdcs_val)
+        # Log to Database (Intervention History)
+        self.db.log_intervention(f"KONDISI_{state}", f"tDCS: {tdcs_val}mA | Light: {lamp_cmd}")
         
         print(f"[Shield] ⚡ Transition to {state} | tDCS: {tdcs_val}mA | Light: {lamp_cmd}")
 
@@ -243,7 +253,7 @@ class DecisionEngine:
         if self.mqtt_client and self.mqtt_client.connected:
             self.mqtt_client.send_emergency_off()
         
-        self.db.save_intervention(self.session_id, "EMERGENCY", reason, 0.0)
+        self.db.log_intervention("EMERGENCY_SHUTDOWN", reason)
         self.running = False
 
     def _publish_telemetry(self):
@@ -280,23 +290,48 @@ class DecisionEngine:
 
         self.mqtt_client.publish_processed_bio(self.session_id, metrics, hardware)
 
-    def _handle_persistence(self):
-        """Menyimpan log ke SQLite setiap 1 detik."""
+    def _handle_buffering(self):
+        """Memasukkan data ke buffer dan simpan ke DB setiap 5 detik."""
+        # Calculate current attention index
+        att_score = min(1.0, self.current_ear / 0.35)
+        if self.current_state in ["FATIGUE", "AWAKE_INTERVENTION"]:
+            att_score *= 0.5
+            
+        emotion = "UNKNOWN"
+        if self.vision:
+            emotion = self.vision.get_citra_anak()["emotion"]
+
+        self.data_buffer.append({
+            "ear": self.current_ear,
+            "attention": att_score,
+            "load": self.cognitive_load,
+            "emotion": emotion
+        })
+
+        # Cek interval 5 detik
         now = time.time()
-        if (now - self.db_save_timer) >= 1.0:
-            emotion = "UNKNOWN"
-            if self.vision:
-                emotion = self.vision.get_citra_anak()["emotion"]
-                
-            self.db.save_log(
-                self.session_id, 
-                focus=self.current_ear, # Temporary focus proxy
-                gsr=self.current_gsr, 
-                hrv=self.current_hrv, 
-                emotion=emotion,
-                state=self.current_state
-            )
-            self.db_save_timer = now
+        if (now - self.last_db_save) >= self.db_save_interval:
+            self._save_buffer_to_db()
+            self.last_db_save = now
+
+    def _save_buffer_to_db(self):
+        """Menghitung rata-rata dan menyimpan ke SQLite."""
+        if not self.data_buffer: return
+
+        avg_ear = sum(d["ear"] for d in self.data_buffer) / len(self.data_buffer)
+        avg_att = sum(d["attention"] for d in self.data_buffer) / len(self.data_buffer)
+        avg_load = sum(d["load"] for d in self.data_buffer) / len(self.data_buffer)
+        
+        emotions = [d["emotion"] for d in self.data_buffer]
+        dominant_emotion = max(set(emotions), key=emotions.count)
+
+        self.db.insert_biometric_log(
+            ear=round(avg_ear, 3),
+            attention=round(avg_att, 2),
+            load=round(avg_load, 2),
+            emotion=dominant_emotion
+        )
+        self.data_buffer.clear()
 
     def _trigger_ai(self, condition):
         # Throttle AI Trigger (max 1x per 30 seconds for same condition)
