@@ -115,10 +115,15 @@ class VisionEngine:
             except Exception as e:
                 print(f"[VisionEngine] Critical Error: {e}")
                 time.sleep(1) # Chill before retry
-            time.sleep(0.02) # ~50 FPS internal throttle
+            time.sleep(0.06) # ~15 FPS internal throttle (CPU Optimized)
 
     def get_ear(self) -> float:
         return round(self.ear_score, 3)
+
+    def is_camera_active(self):
+        """Mengecek apakah kamera terbuka dan menghasilkan frame."""
+        if not self.cap: return False
+        return self.cap.isOpened() and self.is_running
         
     def get_citra_anak(self):
         """Mengembalikan data emosi dan koordinat pupil untuk MQTT"""

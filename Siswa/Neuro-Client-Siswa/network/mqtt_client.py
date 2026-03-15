@@ -18,6 +18,10 @@ class MQTTClient:
         
         self.connected = False
         self.message_callbacks = {}
+
+    def is_connected(self):
+        """Mengecek status koneksi ke MQTT Broker."""
+        return self.connected
         
     def connect(self):
         try:

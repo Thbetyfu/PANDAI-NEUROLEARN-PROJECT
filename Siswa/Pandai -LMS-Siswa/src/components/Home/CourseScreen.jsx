@@ -7,7 +7,7 @@ import DummyDataSets from '../../../dummyDatas';
 
 export default function CoursesScreen() {
   return (
-    <div className='px-6 pb-24 pt-6'>
+    <div className='px-6 pb-32 pt-6'>
       <Title withLogo>Mau belajar apa hari ini?</Title>
 
       <Title level='h3' mb='mb-4'>

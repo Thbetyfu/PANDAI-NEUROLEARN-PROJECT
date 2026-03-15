@@ -3,7 +3,9 @@ import os
 import tkinter as tk
 import sys
 
-from core.decision_engine import DecisionEngine, PandaiCriticalError, VisionCriticalError, SerialCriticalError, MQTTConnectionCriticalError
+from core.exceptions import PandaiCriticalError, VisionCriticalError, HardwareCriticalError, CloudCriticalError
+from core.integrity_manager import IntegrityManager
+import config
 
 # Import Components
 from components.sidebar import SidebarFrame
@@ -35,7 +37,8 @@ class NeuroClientApp(ctk.CTk):
         self.geometry("1440x1024")
         self.configure(fg_color=COLOR_APP_BG)
 
-        # Integrity Tracking
+        # 1. Initialize Managers
+        self.integrity_manager = None
         self.security_token = False
 
         # App State
@@ -93,13 +96,19 @@ class NeuroClientApp(ctk.CTk):
 
         # 7. INIT BACKGROUND SYSTEMS
         try:
-             self.init_core_systems()
-             self.run_integrity_check()
-             # If we get here, hardware is verified!
-             self.security_token = True
-             self.select_page("Beranda")
-        except (PandaiCriticalError, Exception) as e:
-             self.show_panic_screen(str(e))
+            self.init_core_systems()
+            # A. PRE-STARTUP INTEGRITY GUARD
+            try:
+                self.run_integrity_check()
+                self.security_token = True
+                print("[Security] 🛡️ Integrity Check Passed. Security Token Issued.")
+                self.select_page("Beranda") 
+            except PandaiCriticalError as e:
+                print(f"[CRITICAL] 💀 [{e.code}] {e.message}")
+                self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})")
+                return 
+        except Exception as e: 
+             self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}")
              return
 
         # Final Status
@@ -108,22 +117,12 @@ class NeuroClientApp(ctk.CTk):
         print("="*60)
 
     def run_integrity_check(self):
-        """Medical Grade Safety Loop: Verifikasi keberadaan sensor vital."""
-        # 1. Cek Vision System
-        if not self.vision or not self.vision.is_running:
-            raise VisionCriticalError("Kamera Siswa tidak terdeteksi atau rusak. Aplikasi dihentikan demi akurasi data.")
-            
-        # 2. Cek Serial Hardware (ESP32)
-        # Note: Port=None is for simulation, but in production this is a CRITICAL ERROR
-        if not self.serial or not self.serial.connected:
-            raise SerialCriticalError("Sensor GSR/HRV (ESP32) tidak terdeteksi. Pastikan kabel USB terpasang.")
-            
-        # 3. Cek MQTT Cloud
-        if not self.mqtt or not self.mqtt.connected:
-             # Rekoneksi singkat sebelum menyerah
-             time.sleep(1) 
-             if not self.mqtt.connected:
-                raise MQTTConnectionCriticalError("Koneksi Cloud (EMQX) gagal. Sistem intervensi tidak bisa berjalan.")
+        """Standardized Health Check via IntegrityManager [E01-E03]."""
+        if not self.integrity_manager:
+            self.integrity_manager = IntegrityManager(self.vision, self.serial, self.mqtt)
+        
+        # Eksekusi Diagnosa Mendalam
+        self.integrity_manager.perform_full_audit()
 
     def show_panic_screen(self, message):
         """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""
@@ -161,14 +160,14 @@ class NeuroClientApp(ctk.CTk):
         print("="*60)
 
         # 1. MQTT (The Bridge to Dashboard)
-        self.mqtt = MQTTClient(broker_host="broker.emqx.io", broker_port=1883)
+        self.mqtt = MQTTClient(broker_host=config.MQTT_BROKER, broker_port=config.MQTT_PORT)
         self.mqtt.connect()
         # Give a small time for MQTT connect
         time.sleep(0.5)
 
         # 2. Serial Client (The Bridge to ESP32)
-        # Sesuai rule PKM: Wajib mendeteksi hardware fisik
-        self.serial = SerialClient(port=None) 
+        # Unified SerialClient secara otomatis menangani MOCK/REAL via config
+        self.serial = SerialClient(port="COM3") 
 
         # 3. Vision Engine (The Eyes — EAR via Kamera)
         self.vision = VisionEngine(camera_index=0)

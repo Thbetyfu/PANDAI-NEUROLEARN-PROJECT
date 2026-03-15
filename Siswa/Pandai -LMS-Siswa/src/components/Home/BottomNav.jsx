@@ -12,7 +12,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
   const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
 
   return (
-    <div className='bg-white border-t border-gray-100 pb-8 pt-4 px-6 sticky bottom-0 z-50'>
+    <div className='bg-white border-t border-gray-100 pb-8 pt-4 px-6 sticky bottom-0 z-[100]'>
       <div className='relative flex justify-between items-end'>
         <div
           className='absolute -top-4 left-0 w-1/4 h-1.5 flex justify-center transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)'
@@ -29,11 +29,10 @@ export default function BottomNav({ activeTab, onTabChange }) {
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center gap-1 flex-1 transition-colors duration-300 z-10 ${
-                isActive
+              className={`relative flex flex-col items-center gap-1 flex-1 transition-colors duration-300 z-10 ${isActive
                   ? 'text-[#4c3ae3]'
                   : 'text-gray-400 hover:text-gray-600'
-              }`}
+                }`}
             >
               <Icon
                 size={24}
@@ -41,9 +40,8 @@ export default function BottomNav({ activeTab, onTabChange }) {
                 fill={isActive ? '#4c3ae320' : 'none'}
               />
               <span
-                className={`text-[10px] ${
-                  isActive ? 'font-bold' : 'font-medium'
-                }`}
+                className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'
+                  }`}
               >
                 {tab.label}
               </span>

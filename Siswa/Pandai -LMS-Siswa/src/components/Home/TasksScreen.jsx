@@ -6,7 +6,7 @@ import DummyDataSets from '../../../dummyDatas';
 
 export default function TasksScreen() {
   return (
-    <div className='px-6 pb-24 pt-6'>
+    <div className='px-6 pb-32 pt-6'>
       <div className='flex items-center gap-2 mb-8'>
         <h1 className='text-[28px] font-bold bg-gradient-to-r from-black via-[#003EC0] to-[#003EC0] bg-clip-text text-transparent'>
           Tugas yang perlu kamu selesaikan

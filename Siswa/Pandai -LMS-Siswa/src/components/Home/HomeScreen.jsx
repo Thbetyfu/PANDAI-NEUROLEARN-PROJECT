@@ -5,7 +5,7 @@ import Title from '@/components/_shared/Title';
 
 export default function HomeScreen() {
   return (
-    <div className='px-6 pb-24 pt-4'>
+    <div className='px-6 pb-32 pt-4'>
       <div className='flex justify-between items-start mb-6'>
         <div className='flex items-center gap-3'>
           <img

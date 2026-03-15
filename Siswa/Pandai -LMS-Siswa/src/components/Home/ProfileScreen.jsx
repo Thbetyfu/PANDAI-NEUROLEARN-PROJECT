@@ -8,7 +8,7 @@ export default function ProfileScreen() {
   const { isSimulating, setIsSimulating, triggerSimulation } = useNeuroListener();
 
   return (
-    <div className='px-6 pb-24 pt-8'>
+    <div className='px-6 pb-32 pt-8'>
       {/* Header Profile */}
       <div className='flex flex-col items-center mb-10'>
         <div className='relative group cursor-pointer'>
