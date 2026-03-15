@@ -118,11 +118,8 @@ class NeuroClientApp(ctk.CTk):
 
     def run_integrity_check(self):
         """Standardized Health Check via IntegrityManager [E01-E03]."""
-        if not self.integrity_manager:
-            self.integrity_manager = IntegrityManager(self.vision, self.serial, self.mqtt)
-        
-        # Eksekusi Diagnosa Mendalam
-        self.integrity_manager.perform_full_audit()
+        # Menggunakan Static Method sesuai saran Audit (Pola Stateless Audit)
+        IntegrityManager.perform_boot_check(self.vision, self.serial, self.mqtt)
 
     def show_panic_screen(self, message):
         """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""

@@ -1,7 +1,7 @@
 # Siswa/Neuro-Client-Siswa/core/exceptions.py
 
 class PandaiCriticalError(Exception):
-    """Base class untuk semua error fatal di PANDAI NEUROLEARN."""
+    """Base class untuk error yang mewajibkan aplikasi berhenti total."""
     def __init__(self, code, message):
         self.code = code
         self.message = message

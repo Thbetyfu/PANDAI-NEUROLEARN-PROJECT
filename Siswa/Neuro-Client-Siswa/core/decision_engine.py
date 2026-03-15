@@ -28,8 +28,9 @@ class DecisionEngine:
         # New: Persistence Layer (SQLite)
         self.db = DatabaseManager()
         
-        # New: Integrity Manager for Safety Loop
-        self.integrity = IntegrityManager(vision_engine, serial_client, mqtt_client)
+        # New: System Context
+        self.serial = serial_client
+        self.mqtt = mqtt_client
 
         # Security & Integrity Status
         self.is_healthy = True
@@ -128,13 +129,13 @@ class DecisionEngine:
         """Watchdog: Gabungan pengecekan data beku (Fast) & audit sistemik (Slow)."""
         now = time.time()
         
-        # 1. Fast Watchdog: Deteksi sensor beku/tersenggol (> 3 detik)
-        if (now - self.last_data_timestamp) > 3.0:
-            raise HardwareCriticalError("E02", "WATCHDOG: Sensor biometrik berhenti merespon (Frozen).")
+        # 1. Fast Watchdog: Deteksi sensor beku/macet (> 5.0 detik) sesuai Audit QA
+        if (now - self.last_data_timestamp) > 5.0:
+            raise HardwareCriticalError("E02", "WATCHDOG: Aliran data biometrik terhenti (Frozen) > 5 detik.")
 
-        # 2. Slow Systemic Audit: Audit kesehatan modul (tiap 5 detik)
+        # 2. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
         if (now - self.last_audit_timestamp) > 5.0:
-            self.integrity.perform_full_audit()
+            IntegrityManager.check_health(self.vision, self.serial, self.mqtt)
             self.last_audit_timestamp = now
 
         try:
