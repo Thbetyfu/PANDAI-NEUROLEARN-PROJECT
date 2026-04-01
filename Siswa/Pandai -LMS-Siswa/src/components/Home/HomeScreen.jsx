@@ -2,8 +2,23 @@ import React from 'react';
 import ListCard from '../_shared/ListCard';
 import { Bell } from 'lucide-react';
 import Title from '@/components/_shared/Title';
+import PandaAvatar from '../_shared/Panda/PandaAvatar';
+import { useNeuroMqtt } from '@/hooks/useNeuroMqtt';
+import { useFocusStreak } from '@/hooks/useFocusStreak';
 
 export default function HomeScreen() {
+  const { neuroData } = useNeuroMqtt();
+  const { streakMinutes, secondsInFlow } = useFocusStreak(neuroData);
+
+  const getAdvice = () => {
+    if (!neuroData) return "PANDAI sedang menganalisis kondisi belajarmu...";
+    const { focus_index, cognitive_load, ear } = neuroData;
+    if (ear < 0.2) return "Ayo bangun! Cobalah regangkan badanmu sebentar agar matamu kembali segar.";
+    if (cognitive_load > 0.7) return "Beban kognitifmu tinggi! Ambil napas dalam atau minum air putih dulu ya.";
+    if (focus_index > 0.75) return "Kamu dalam Zona Flow! Pertahankan fokusmu, kamu sedang belajar sangat efektif.";
+    return "Siap untuk sesi belajar berikutnya? Fokusmu mulai stabil sekarang.";
+  };
+
   return (
     <div className='px-6 pb-32 pt-4'>
       <div className='flex justify-between items-start mb-6'>
@@ -25,10 +40,12 @@ export default function HomeScreen() {
         </button>
       </div>
 
-      <h1 className='text-[28px] font-bold mb-8 flex items-center gap-2 bg-linear-to-r from-black to-[#003EC0] bg-clip-text text-transparent b'>
-        Hellooo, Mozart{' '}
-        <div className='bg-logo-only bg-cover bg-no-repeat w-8 aspect-42/34 inline-block animate-bounce'></div>
-      </h1>
+      <div className='flex flex-col items-center mb-8'>
+        <PandaAvatar size={160} />
+        <h1 className='text-[28px] font-bold mt-4 bg-linear-to-r from-black to-[#003EC0] bg-clip-text text-transparent'>
+          Hellooo, Mozart
+        </h1>
+      </div>
 
       <div className='relative w-full aspect-[4/3] rounded-[2rem] overflow-hidden mb-6 shadow-xl shadow-blue-200/50 group'>
         <div className='absolute inset-0 bg-gradient-to-b from-primary-blue to-[#7d6dfb]  '>
@@ -48,25 +65,40 @@ export default function HomeScreen() {
         <div className='absolute -bottom-20 -right-20 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl'></div>
         <div className='absolute -top-20 -left-20 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl'></div>
       </div>
+      {/* Focus Streak & AI Advice Section */}
+      <div className='bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8'>
+        <div className='flex justify-between items-center mb-6'>
+          <h3 className='font-bold text-gray-800 text-sm italic'>🔥 Focus Streak</h3>
+          <div className='bg-blue-50 text-primary-blue px-3 py-1 rounded-full text-[10px] font-bold'>
+            {streakMinutes} MIN FLOW
+          </div>
+        </div>
+        
+        <div className='flex flex-col gap-2'>
+          <div className='w-full h-2 bg-gray-100 rounded-full overflow-hidden'>
+            <div 
+              className='h-full bg-primary-blue transition-all duration-1000' 
+              style={{ width: `${(secondsInFlow / 60) * 100}%` }}
+            />
+          </div>
+          <span className='text-[9px] text-gray-400 text-right font-medium uppercase'>
+            NEXT MINUTE REWARD IN {60 - secondsInFlow}S
+          </span>
+        </div>
+      </div>
+
       <div className='bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8'>
         <div className='flex justify-center mb-4'>
           <h3 className='font-bold flex items-center gap-2 bg-gradient-to-b from-black to-[#003EC0] bg-clip-text text-transparent text-base'>
-            Progress Harian
+            <span className='w-2 h-2 rounded-full bg-primary-blue animate-pulse' />
+            Saran Belajar (Live)
           </h3>
         </div>
-        <div className='flex items-center'>
-          <div className='flex-1 flex flex-col items-center gap-1 border-r border-gray-100'>
-            <span className='text-gray-400 text-xs font-medium'>
-              Materi dipelajari
-            </span>
-            <span className='text-4xl font-bold text-[#0f0c29]'>3</span>
-          </div>
-          <div className='flex-1 flex flex-col items-center gap-1'>
-            <span className='text-gray-400 text-xs font-medium'>
-              Tugas Dikerjakan
-            </span>
-            <span className='text-4xl font-bold text-[#0f0c29]'>2</span>
-          </div>
+        <div className='p-5 rounded-[1.5rem] bg-indigo-50/50 border border-indigo-100/50 flex flex-col items-center text-center'>
+          <span className='px-3 py-1 bg-white rounded-full text-[10px] font-bold text-indigo-600 shadow-sm mb-3 border border-indigo-100 uppercase tracking-tighter'>ROBOTIC FEEDBACK</span>
+          <p className='text-gray-700 font-bold leading-relaxed text-[13px] tracking-tight antialiased italic'>
+            "{getAdvice()}"
+          </p>
         </div>
       </div>
       <div>

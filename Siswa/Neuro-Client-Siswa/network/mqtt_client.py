@@ -49,6 +49,7 @@ class MQTTClient:
             self.subscribe("pandai/v1/bio/raw")
             self.subscribe("pandai/v1/system/safety")
             self.subscribe("pandai/v1/actuator/tdcs")
+            self.subscribe("pandai/v1/history/request")
         else:
             print(f"[MQTT] Connection failed with code {reason_code}")
             
@@ -74,11 +75,15 @@ class MQTTClient:
         for t, callback in self.message_callbacks.items():
             if mqtt.topic_matches_sub(t, topic):
                 try:
-                    data = json.loads(payload)
-                    callback(topic, data)
-                except json.JSONDecodeError:
-                    # If not JSON, pass as string
-                    callback(topic, payload)
+                    try:
+                        data = json.loads(payload)
+                        callback(topic, data)
+                    except json.JSONDecodeError:
+                        # If not JSON, pass as string
+                        callback(topic, payload)
+                except Exception as e:
+                    # Mencegah logic di dalam callback menghancurkan Thread utama MQTT
+                    print(f"[MQTT] 🚨 Isolasi Error: Kegagalan dalam mengeksekusi callback pada topik '{topic}'. Detail: {e}")
                     
     def publish_processed_bio(self, session_id, metrics, hardware_state):
         """Method to publish data according to protocol-iot.md"""
@@ -115,3 +120,14 @@ class MQTTClient:
             print("[MQTT] 🚨 SENDING EMERGENCY OFF 🚨")
             self.client.publish("pandai/v1/actuator/tdcs", "EMERGENCY_OFF", qos=2)
             self.client.publish("pandai/v1/system/safety", "EMERGENCY_OFF", qos=2)
+
+    def publish(self, topic, payload):
+        """Generic publish method."""
+        if not self.connected:
+            return False
+        try:
+            self.client.publish(topic, json.dumps(payload) if isinstance(payload, (dict, list)) else str(payload), qos=1)
+            return True
+        except Exception as e:
+            print(f"[MQTT] Generic publish failed: {e}")
+            return False

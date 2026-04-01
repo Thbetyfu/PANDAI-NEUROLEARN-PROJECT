@@ -48,7 +48,7 @@ class DatabaseManager:
     def insert_biometric_log(self, ear, attention, load, emotion="NORMAL"):
         """Menyimpan data ringkasan ke database."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO biometric_logs (ear_score, attention_index, cognitive_load, emotion_state)
@@ -56,13 +56,15 @@ class DatabaseManager:
             ''', (ear, attention, load, emotion))
             conn.commit()
             conn.close()
+        except sqlite3.OperationalError as e:
+            print(f"[DATABASE] ⚠️ Memori sementara terkunci (Locked) oleh thread lain: {e}")
         except Exception as e:
             print(f"[DATABASE] ⚠️ Gagal menyimpan log: {e}")
 
     def log_intervention(self, reason, action):
         """Mencatat kapan sistem memberikan intervensi."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO intervention_history (trigger_reason, action_taken)
@@ -71,14 +73,16 @@ class DatabaseManager:
             conn.commit()
             conn.close()
             print(f"[DATABASE] ⚡ Intervensi Dicatat: {reason} -> {action}")
+        except sqlite3.OperationalError as e:
+            print(f"[DATABASE] ⚠️ Gagal menyimpan intervensi karena Database Locked: {e}")
         except Exception as e:
-            print(f"[DATABASE] ⚠️ Gagal menyimpan intervensi: {e}")
+            print(f"[DATABASE] ⚠️ Gagal menyimpan intervensi secara general: {e}")
 
     def clean_old_data(self, days=30):
         """Menghapus data yang lebih tua dari X hari untuk menghemat memori."""
         try:
             cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM biometric_logs WHERE timestamp < ?', (cutoff_date,))
             deleted = cursor.rowcount
@@ -86,6 +90,38 @@ class DatabaseManager:
             conn.close()
             if deleted > 0:
                 print(f"[DATABASE] 🧹 Membersihkan {deleted} baris data lama.")
+        except sqlite3.OperationalError as e:
+            print(f"[DATABASE] ⚠️ Cleanup dibatalkan sementara karena Database Locked: {e}")
         except Exception as e:
-            print(f"[DATABASE] 🧹 Cleanup error: {e}")
+            print(f"[DATABASE] ⚠️ Cleanup error tak terduga: {e}")
             pass
+
+    def get_history_data(self, days=7):
+        """Mengambil rata-rata harian (fokus & stres) selama X hari terakhir."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Query untuk mengelompokkan rata-rata per hari
+            query = """
+                SELECT 
+                    date(timestamp) as date,
+                    AVG(attention_index) as avg_focus,
+                    AVG(cognitive_load) as avg_load
+                FROM biometric_logs 
+                WHERE timestamp > datetime('now', ?)
+                GROUP BY date(timestamp)
+                ORDER BY date ASC
+            """
+            cursor.execute(query, (f'-{days} days',))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            return [dict(row) for row in rows]
+        except sqlite3.OperationalError as e:
+            print(f"[DATABASE] ⚠️ Gagal mengambil query History karena Database Locked: {e}")
+            return []
+        except Exception as e:
+            print(f"[DATABASE] ⚠️ Tabel korup atau error tak terduga: {e}")
+            return []

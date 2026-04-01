@@ -186,10 +186,13 @@ class NeuroClientApp(ctk.CTk):
         )
         self.engine.start()
 
-        # Inject engine to Stat page and start update loop
+        # Inject engine and start update loop
         if "Statistik Anda" in self.pages:
             self.pages["Statistik Anda"].engine = self.engine
             self.pages["Statistik Anda"].update_realtime()
+        
+        if "Beranda" in self.pages:
+            self.pages["Beranda"].engine = self.engine
 
     def on_closing(self):
         print("Tutup app, mematikan semua sistem...")

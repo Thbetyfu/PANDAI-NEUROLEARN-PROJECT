@@ -69,6 +69,10 @@ class DecisionEngine:
         self.last_audit_timestamp = time.time() # Integrity: System Audit (Slow)
         self.db_save_timer = 0 # Throttle DB write to 1fps
 
+        # [NEW] MQTT Callbacks
+        if self.mqtt:
+            self.mqtt.add_callback("pandai/v1/history/request", self._handle_history_request)
+
     def start(self):
         print(f"[Engine] 🧠 Neuro-Architect Protocol Berjalan (Sesi: {self.session_id})")
         self.running = True
@@ -88,7 +92,7 @@ class DecisionEngine:
 
     def _run_loop(self):
         while self.running:
-            try:
+            try: # 🛡️ BEMPER UTAMA DIMULAI DI SINI
                 # 0. Runtime Integrity Check (Medical Safety Loop)
                 self._check_runtime_integrity()
 
@@ -130,9 +134,18 @@ class DecisionEngine:
                 print(f"[Engine] Runtime Critical Error: {e}")
                 self._trigger_emergency(str(e))
                 self.running = False
+            except ZeroDivisionError:
+                print("[ENGINE] ⚠️ Terjadi pembagian dengan nol saat menghitung rata-rata.")
+            except KeyError as e:
+                print(f"[ENGINE] ⚠️ Format data tidak sesuai, kehilangan kunci: {e}")
             except Exception as e:
-                print(f"[Engine] Unexpected Loop Error: {e}")
-                
+                # 🛡️ JARING PENGAMAN TERAKHIR
+                # Menangkap SEMUA jenis error agar loop utama tidak pernah mati!
+                print(f"\n[ENGINE] 🚨 KESALAHAN FATAL DI LOOP UTAMA: {e}")
+                print("[ENGINE] 🔄 Sistem memulihkan diri otomatis dalam 1 detik...\n")
+                time.sleep(1) # Beri waktu istirahat agar tidak nge-spam terminal
+            
+            # Istirahat 0.1 detik wajib ada di luar try-except
             time.sleep(0.1)
 
     def _check_runtime_integrity(self):
@@ -172,11 +185,27 @@ class DecisionEngine:
             self._trigger_emergency(self.error_message)
             raise e
 
+    def reset_baselines(self):
+        """Mereset semua rata-rata bergerak untuk kalibrasi ulang (Manual atau tiap Sesi)."""
+        print("[Engine] 🔄 Melakukan Kalibrasi Ulang Biometrik...")
+        self.ear_ma.clear()
+        self.gsr_ma.clear()
+        self.hrv_ma.clear()
+        self.last_data_timestamp = time.time()
+        # Jika ada vision, kunci identitas baru
+        if self.vision:
+            self.vision.set_reference_identity()
+
     def _evaluate_cognitive_state(self):
         """
         Multimodal Fusion Logic:
         Mengkombinasikan berbagai sensor untuk menentukan kondisi kognitif presisi.
         """
+        if hasattr(self.vision, 'identity_verified') and not self.vision.identity_verified:
+            if self.current_state != "IDENTITY_LOCK":
+                self._update_state("IDENTITY_LOCK", 0.0, "#000000|100")
+            return
+
         now = time.time()
         should_print = (now - self.last_print_time) >= 1.5
         
@@ -211,6 +240,13 @@ class DecisionEngine:
         elif stress_spike:
             self._update_state("HIGH_STRESS", 1.0, "#A241FF|70") # Purple alert
             self._trigger_ai("STRESS")
+
+        # 0. Detect Identity Mismatch (Anti-Cheat)
+        if hasattr(self.vision_engine, 'identity_verified') and not self.vision_engine.identity_verified:
+            if self.current_state != "IDENTITY_LOCK":
+                self._update_state("IDENTITY_LOCK", 0.0, "#000000|100") # Dark alert - Cut tDCS
+                self.db.log_intervention("SECURITY_ALERT", "Mismatch Identitas Siswa")
+            return
 
         # 4. FLOW STATE (Normal/Optimal)
         else:
@@ -271,7 +307,8 @@ class DecisionEngine:
              "hr_bpm": round(self.current_hr, 1),
              "ear_score": round(self.current_ear, 3),
              "attention_index": round(att_score, 2),
-             "state": self.current_state
+             "state": self.current_state,
+             "identity_verified": getattr(self.vision, 'identity_verified', True)
         }
 
         # 2. Citra Anak (Emotion & Gaze)
@@ -349,3 +386,27 @@ class DecisionEngine:
              print(f"\n🧠 [PANDAI AI Core]: {saran}\n")
         except:
              pass
+
+    def _handle_history_request(self, topic, data):
+        """Merespon jika Dashboard meminta riwayat belajar."""
+        print(f"[Engine] 📬 Request Riwayat Diterima: {data}")
+        
+        # Cek apakah request menanyakan durasi spesifik
+        days = 7
+        if isinstance(data, dict) and "days" in data:
+            days = data["days"]
+        elif data == "GET_7_DAYS":
+            days = 7
+            
+        history = self.db.get_history_data(days=days)
+        
+        response_payload = {
+            "status": "SUCCESS",
+            "request_topic": topic,
+            "data": history,
+            "timestamp_response": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        if self.mqtt:
+            self.mqtt.publish("pandai/v1/history/response", response_payload)
+            print(f"[Engine] 📤 Riwayat {days} Hari Telah Dikirim.")

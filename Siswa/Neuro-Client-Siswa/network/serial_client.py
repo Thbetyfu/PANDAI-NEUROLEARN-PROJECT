@@ -54,7 +54,16 @@ class SerialClient:
             if self.ser.in_waiting > 0:
                 line = self.ser.readline().decode('utf-8').strip()
                 return json.loads(line)
-        except:
+        except serial.SerialException as e:
+            # PETUNJUK ERROR JELAS:
+            print(f"[HARDWARE] 🚨 FATAL: Koneksi USB ESP32 terputus mendadak! Detail: {e}")
+            self.is_connected = False
+            return None
+        except UnicodeDecodeError:
+            print("[HARDWARE] ⚠️ Data Serial masuk tidak terbaca (Kabel mungkin goyang). Mengabaikan...")
+            return None
+        except Exception as e:
+            print(f"[HARDWARE] ⚠️ Error tak terduga pada Sensor: {e}")
             return None
         return None
 

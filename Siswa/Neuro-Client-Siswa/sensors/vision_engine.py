@@ -19,6 +19,11 @@ class VisionEngine:
         self.current_emotion = "NEUTRAL"
         self.pupil_coords = {"x": 0.5, "y": 0.5}
         self.frame_count = 0 # Untuk FPS Throttling
+        
+        # New: Anti-Cheat / Identification
+        self.reference_signature = None
+        self.identity_verified = True # Default true until reference set
+        self.identity_mismatch_frames = 0
 
     def _calculate_distance(self, p1, p2):
         return ((p1.x - p2.x)**2 + (p1.y - p2.y)**2)**0.5
@@ -65,6 +70,55 @@ class VisionEngine:
                 "y": round((iris_left.y + iris_right.y) / 2, 3)
             }
 
+    def _get_face_signature(self, mesh):
+        """Menciptakan fingerprint wajah unik berdasarkan rasio jarak landmark."""
+        # 1. Jarak Mata (p33 ke p263)
+        eye_dist = self._calculate_distance(mesh[33], mesh[263])
+        # 2. Panjang Hidung (p1 ke p2)
+        nose_len = self._calculate_distance(mesh[1], mesh[2])
+        # 3. Lebar Mulut (p61 ke p291)
+        mouth_width = self._calculate_distance(mesh[61], mesh[291])
+        # 4. Tinggi Wajah (p10 ke p152)
+        face_height = self._calculate_distance(mesh[10], mesh[152])
+        
+        if eye_dist == 0: return None
+        
+        # Gunakan rasio agar invarian terhadap skala (maju-mundur kepala)
+        return {
+            "eye_nose_ratio": round(eye_dist / nose_len, 3) if nose_len != 0 else 0,
+            "mouth_eye_ratio": round(mouth_width / eye_dist, 3),
+            "face_width_ratio": round(eye_dist / face_height, 3) if face_height != 0 else 0
+        }
+
+    def set_reference_identity(self):
+        """Mengambil sampel wajah saat ini sebagai referensi identitas siswa."""
+        print("[Vision] 🔐 Mengunci Identitas Referensi...")
+        self.reference_signature = "PENDING" # Flag untuk nunggu frame berikutnya
+        return True
+
+    def _verify_identity(self, current_sig):
+        """Membandingkan signature saat ini dengan referensi."""
+        if not self.reference_signature or self.reference_signature == "PENDING":
+            return True
+            
+        diffs = []
+        for key in self.reference_signature:
+            ref = self.reference_signature[key]
+            curr = current_sig[key]
+            if ref == 0: continue
+            diffs.append(abs(curr - ref) / ref)
+            
+        avg_diff = sum(diffs) / len(diffs) if diffs else 0
+        
+        # Threshold 15% deviasi dianggap orang berbeda/kecurangan
+        if avg_diff > 0.15:
+            self.identity_mismatch_frames += 1
+            if self.identity_mismatch_frames > 30: # ~2 detik mismatch konstan
+                self.identity_verified = False
+        else:
+            self.identity_mismatch_frames = 0
+            self.identity_verified = True
+
     def start(self):
         self.is_running = True
         self.cap = cv2.VideoCapture(self.camera_index)
@@ -84,37 +138,51 @@ class VisionEngine:
         while self.is_running:
             try:
                 success, frame = self.cap.read()
-                if success:
-                    results = self.face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    if results.multi_face_landmarks:
-                        self.no_face_frames = 0
-                        mesh = results.multi_face_landmarks[0].landmark
-                        
-                        # Hitung rata-rata 2 mata agar lebih akurat dibanding 1 sebelah saja
-                        left_ear = self._calculate_ear(mesh, LEFT_EYE)
-                        right_ear = self._calculate_ear(mesh, RIGHT_EYE)
-                        avg_ear = (left_ear + right_ear) / 2.0
-                        
-                        self.ear_history.append(avg_ear)
-                        # Smoothening result
-                        self.ear_score = sum(self.ear_history) / len(self.ear_history)
-                        
-                        # FPS Throttling: Emosi & Pupil hanya diproses setiap 5 frame (~10 FPS)
-                        self.frame_count += 1
-                        if self.frame_count >= 5:
-                            try:
-                                self._detect_citra_anak(mesh)
-                            except Exception as e_citra:
-                                print(f"[VisionEngine] Citra Anak Error: {e_citra}")
-                            self.frame_count = 0
-                    else:
-                        self.no_face_frames += 1
-                        self.current_emotion = "OFF-CAMERA"
-                        if self.no_face_frames > 15: # Jika separuh detik tidak ada wajah
-                            self.ear_score = 0.0 # Force Drowsy / Alert System
+                if not success:
+                    print("[VISION] ⚠️ Gagal mendapat gambar dari kamera. Mencoba lagi...")
+                    time.sleep(1)
+                    continue
+                    
+                results = self.face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                if results.multi_face_landmarks:
+                    self.no_face_frames = 0
+                    mesh = results.multi_face_landmarks[0].landmark
+                    
+                    # Hitung rata-rata 2 mata agar lebih akurat dibanding 1 sebelah saja
+                    left_ear = self._calculate_ear(mesh, LEFT_EYE)
+                    right_ear = self._calculate_ear(mesh, RIGHT_EYE)
+                    avg_ear = (left_ear + right_ear) / 2.0
+                    
+                    self.ear_history.append(avg_ear)
+                    # Smoothening result
+                    self.ear_score = sum(self.ear_history) / len(self.ear_history)
+                    
+                    # FPS Throttling: Emosi & Pupil hanya diproses setiap 5 frame (~10 FPS)
+                    self.frame_count += 1
+                    if self.frame_count >= 5:
+                        try:
+                            self._detect_citra_anak(mesh)
+                            
+                            # Process Identity Tracking
+                            current_sig = self._get_face_signature(mesh)
+                            if self.reference_signature == "PENDING" and current_sig:
+                                self.reference_signature = current_sig
+                                print(f"[Vision] ✅ Identitas Terkunci: {self.reference_signature}")
+                            elif current_sig:
+                                self._verify_identity(current_sig)
+                                
+                        except Exception as e_citra:
+                            print(f"[VisionEngine] Citra Anak Error: {e_citra}")
+                        self.frame_count = 0
+                else:
+                    self.no_face_frames += 1
+                    self.current_emotion = "OFF-CAMERA"
+                    if self.no_face_frames > 15: # Jika separuh detik tidak ada wajah
+                        self.ear_score = 0.0 # Force Drowsy / Alert System
             except Exception as e:
-                print(f"[VisionEngine] Critical Error: {e}")
-                time.sleep(1) # Chill before retry
+                # Menangkap error MediaPipe/OpenCV agar thread tidak mati
+                print(f"[VISION] 🚨 Engine Penglihatan Crash: {e}")
+                time.sleep(0.5)
             time.sleep(0.06) # ~15 FPS internal throttle (CPU Optimized)
 
     def get_ear(self) -> float:
