@@ -289,7 +289,7 @@ class CameraWidget(tk.Toplevel):
     Safety: Graceful fallback if camera is unavailable.
     """
 
-    def __init__(self, master: ctk.CTk | None = None, **kwargs):
+    def __init__(self, master: ctk.CTk | None = None, vision_engine=None, **kwargs):
         super().__init__(master)
 
         # Frameless, Always On Top
@@ -311,8 +311,9 @@ class CameraWidget(tk.Toplevel):
         self._drag_x = 0
         self._drag_y = 0
 
-        # Camera state
-        self.cap = None
+        # 🛡️ Terima VisionEngine dari luar — TIDAK membuka kamera baru
+        # (mencegah konflik dual camera access di Windows)
+        self.vision_engine = vision_engine
         self.is_running = False
 
         self._build_widget()
@@ -375,39 +376,26 @@ class CameraWidget(tk.Toplevel):
         self._minimized = False
 
     def _start_camera(self):
-        """Initialize webcam capture with safety fallback."""
-        try:
-            import cv2
-
-            self.cap = cv2.VideoCapture(0)
-            if self.cap.isOpened():
-                self.is_running = True
-                self._update_frame()
-            else:
-                self.cam_label.configure(text="⚠️ Kamera tidak tersedia")
-        except ImportError:
-            self.cam_label.configure(text="📷 OpenCV belum terinstall\npip install opencv-python")
-        except Exception as e:
-            self.cam_label.configure(text=f"⚠️ Error: {str(e)[:30]}")
+        """Sambungkan ke VisionEngine yang sudah berjalan (tidak buka kamera baru)."""
+        if self.vision_engine and self.vision_engine.is_camera_active():
+            self.is_running = True
+            self._update_frame()
+        else:
+            self.cam_label.configure(text="⚠️ VisionEngine belum aktif")
 
     def _update_frame(self):
-        """Capture and display webcam frame."""
-        if not self.is_running or self.cap is None:
+        """Ambil frame dari VisionEngine dan tampilkan di widget (15 FPS)."""
+        if not self.is_running or self.vision_engine is None:
             return
         if self._minimized:
             self.after(500, self._update_frame)
             return
 
         try:
-            import cv2
-
-            ret, frame = self.cap.read()
-            if ret:
-                # Convert BGR to RGB
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (200, 140))
-
-                pil_img = Image.fromarray(frame)
+            pil_img = self.vision_engine.get_frame()
+            if pil_img is not None:
+                # Scale ke ukuran widget
+                pil_img = pil_img.resize((200, 140))
                 ctk_img = ctk.CTkImage(
                     light_image=pil_img, dark_image=pil_img, size=(200, 140)
                 )
@@ -441,8 +429,6 @@ class CameraWidget(tk.Toplevel):
         self.geometry(f"+{x}+{y}")
 
     def destroy(self):
-        """Cleanup camera resource on destroy."""
+        """Cleanup widget. Kamera TIDAK di-release di sini (milik VisionEngine)."""
         self.is_running = False
-        if self.cap is not None:
-            self.cap.release()
         super().destroy()

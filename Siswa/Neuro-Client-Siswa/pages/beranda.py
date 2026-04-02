@@ -676,11 +676,12 @@ class BerandaPage(ctk.CTkFrame):
             print(f"  -> HUD gagal: {e}")
             self.hud_ref = None
         
-        # Spawn Camera Widget (kamera laptop di pojok kanan bawah)
-        # Fungsi kamera: Memantau ekspresi wajah siswa untuk deteksi kantuk
-        # dan distraksi menggunakan Computer Vision (pengembangan selanjutnya)
+        # Spawn Camera Widget — gunakan VisionEngine yang sudah berjalan
+        # agar tidak ada 2 proses OpenCV membuka kamera yang sama (Windows crash!)
         try:
-            self.cam_ref = CameraWidget(self.winfo_toplevel())
+            vision_ref = getattr(self, 'engine', None)
+            vision_ref = getattr(vision_ref, 'vision_engine', None) if vision_ref else None
+            self.cam_ref = CameraWidget(self.winfo_toplevel(), vision_engine=vision_ref)
             print("  -> Kamera monitoring aktif")
         except Exception as e:
             print(f"  -> Kamera gagal: {e}")
