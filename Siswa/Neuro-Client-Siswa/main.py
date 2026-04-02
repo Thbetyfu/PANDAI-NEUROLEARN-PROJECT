@@ -1,32 +1,34 @@
-import customtkinter as ctk
-import os
-import tkinter as tk
-import sys
 import time
 import threading
+import os
+import sys
+import tkinter as tk
+import customtkinter as ctk
 
+# Import Core Logics
 from core.exceptions import PandaiCriticalError, VisionCriticalError, HardwareCriticalError, CloudCriticalError
 from core.integrity_manager import IntegrityManager
 import config
 
-# Import Components
+# Import Components & Pages
 from components.sidebar import SidebarFrame
 from components.header import HeaderFrame
-
-# Import Pages
 from pages.beranda import BerandaPage
 from pages.statistik_anda import StatistikPage
 from pages.profil_anda import ProfilPage
 from pages.debug_display import DebugDisplayPage
 
-# Import Core Systems
+# Import Networking & Sensors
 from network.mqtt_client import MQTTClient
 from network.serial_client import SerialClient
 from ai.ollama_client import LocalAIClient
 from core.decision_engine import DecisionEngine
 from sensors.vision_engine import VisionEngine
 
-# --- KONFIGURASI DESAIN PANDAI (FIGMA SPEC) ---
+# Debug Check: Verify standard libraries
+print(f"[BOOT] Initializing Neuro-Client Core (Time Module: {time}, OS: {os.name})")
+
+# Konfigurasi Desain
 COLOR_APP_BG = "#F8F8F8"
 COLOR_SIDEBAR_BG = "#F8F8F8"
 

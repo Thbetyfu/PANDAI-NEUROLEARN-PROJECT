@@ -10,56 +10,61 @@ export function useNeuroListener() {
     const mqttClientRef = useRef(null);
 
     useEffect(() => {
-        let client = null;
-        let isMounted = true;
+        if (!mqttClientRef.current) {
+            // Unify with Python: Use Public Cloud Broker to avoid local WebSocket issues
+            const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+                clientId: `LMS_WEB_${Math.random().toString(16).slice(3)}`,
+                clean: true,
+                reconnectPeriod: 5000,
+            });
 
-        if (isSimulating) {
-            // ...
-        } else {
-            console.log('[NeuroListener] Menghubungkan ke Broker Mosquitto Local (WebSocket port 9001)...');
-            const wsUrl = 'ws://localhost:9001'; 
-            client = mqtt.connect(wsUrl);
-            mqttClientRef.current = client;
+            const DEVICE_ID = "PANDAI_NC_01";
+            const PROCESSED_TOPIC = `pandai/v1/${DEVICE_ID}/bio/processed`;
+            const CONTROL_TOPIC = `pandai/v1/${DEVICE_ID}/control/camera`;
 
             client.on('connect', () => {
-                if (!isMounted || client.disconnecting) return;
+                console.log('✅ Connected to Public MQTT Broker (EMQX)');
                 setIsConnected(true);
-                client.subscribe('pandai/v1/bio/processed');
+                client.subscribe([PROCESSED_TOPIC], (err) => {
+                    if (!err) console.log(`📡 Subscribed to ${PROCESSED_TOPIC}`);
+                });
             });
 
             client.on('message', (topic, message) => {
-                if (!isMounted) return;
-                try {
-                    const payload = JSON.parse(message.toString());
-                    const metrics = payload.payload?.metrics || payload.metrics;
-                    if (metrics) {
-                        setBioData(metrics);
-                        if (metrics.state) setNeuroState(metrics.state);
+                if (topic === PROCESSED_TOPIC) {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        setBioData(data);
+                        setNeuroState(prev => ({
+                            ...prev,
+                            focusLevel: data.focus_level || 0,
+                            stressLevel: data.stress_level || 0,
+                            isDrowsy: data.is_drowsy || false,
+                            isBored: data.is_bored || false
+                        }));
+                    } catch (e) {
+                        console.error('Error parsing MQTT message:', e);
                     }
-                } catch (error) {
-                    console.error('[NeuroListener] Error parsing message:', error);
                 }
             });
 
-            client.on('close', () => {
-                if (isMounted) setIsConnected(false);
+            client.on('error', (err) => {
+                console.error('MQTT Error:', err);
+                setIsConnected(false);
             });
 
-            client.on('error', (err) => {
-                if (!isMounted) return;
-                console.error('[NeuroListener] ❌ MQTT Connection Error:', err);
+            client.on('close', () => {
+                console.log('MQTT Disconnected');
+                setIsConnected(false);
             });
+
+            mqttClientRef.current = client;
         }
 
-        const currentClient = client;
-
         return () => {
-            isMounted = false;
-            if (simTimer.current) clearInterval(simTimer.current);
-            if (currentClient) currentClient.end(true);
-            mqttClientRef.current = null;
+            // Persistent client across re-renders
         };
-    }, [isSimulating]);
+    }, []);
 
     const triggerSimulation = (stateName) => {
         setIsSimulating(true);
@@ -69,7 +74,9 @@ export function useNeuroListener() {
     const switchCamera = (index) => {
         if (mqttClientRef.current && isConnected) {
             console.log(`[NeuroListener] Sending camera switch command to index: ${index}`);
-            mqttClientRef.current.publish('pandai/v1/control/camera', JSON.stringify({ index }));
+            const DEVICE_ID = "PANDAI_NC_01";
+            const CONTROL_TOPIC = `pandai/v1/${DEVICE_ID}/control/camera`;
+            mqttClientRef.current.publish(CONTROL_TOPIC, JSON.stringify({ index }));
         } else {
             console.warn('[NeuroListener] Cannot switch camera: MQTT client not connected');
         }

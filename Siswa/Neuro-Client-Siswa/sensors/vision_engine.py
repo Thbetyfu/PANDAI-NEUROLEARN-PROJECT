@@ -81,26 +81,35 @@ class VisionEngine:
     def list_available_cameras():
         """
         Mendeteksi semua indeks kamera yang tersedia di sistem.
-        Mencoba beberapa backend (DSHOW & MSMF) untuk kompatibilitas Windows.
+        Mencoba beberapa backend (DSHOW & MSMF & Default) untuk kompatibilitas Windows.
         """
         available = []
-        # Kita cek hingga index 5 (biasanya cukup untuk laptop + webcam eksternal)
-        for i in range(6):
-            # Coba backend DirectShow (Cepat di Windows)
-            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
-            if cap is not None and cap.isOpened():
-                success, _ = cap.read()
-                if success:
-                    available.append(i)
-                cap.release()
-                continue
-            
-            # Fallback ke backend default jika DSHOW gagal
-            cap = cv2.VideoCapture(i)
-            if cap is not None and cap.isOpened():
-                available.append(i)
-                cap.release()
-                
+        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, None]
+        
+        print("[Vision] 🔍 Memulai pemindaian hardware kamera...")
+        for i in range(5): # Cek index 0-4
+            found = False
+            for b in backends:
+                try:
+                    if b is not None:
+                        cap = cv2.VideoCapture(i, b)
+                    else:
+                        cap = cv2.VideoCapture(i)
+                        
+                    if cap is not None and cap.isOpened():
+                        # Verifikasi apakah benar-benar bisa baca frame
+                        success, _ = cap.read()
+                        if success:
+                            available.append(i)
+                            print(f"[Vision] ✅ Kamera terdeteksi di Index {i} (Backend: {b})")
+                            found = True
+                        cap.release()
+                        if found: break
+                except:
+                    continue
+        
+        if not available:
+            print("[Vision] ⚠️ Tidak ada kamera aktif yang terdeteksi.")
         return available
 
     # ================================================================

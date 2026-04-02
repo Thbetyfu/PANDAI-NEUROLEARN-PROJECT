@@ -2,12 +2,16 @@ import paho.mqtt.client as mqtt
 import json
 import time
 import threading
+import config
 
 class MQTTClient:
-    def __init__(self, client_id="PANDAI-NC-01", broker_host="localhost", broker_port=1883):
-        self.client_id = client_id
-        self.broker_host = broker_host
-        self.broker_port = broker_port
+    def __init__(self, client_id=None, broker_host=None, broker_port=None):
+        self.client_id = client_id or config.DEVICE_ID
+        self.broker_host = broker_host or config.MQTT_BROKER
+        self.broker_port = broker_port or config.MQTT_PORT
+        
+        # Topic Prefixes to avoid conflict on Public Broker
+        self.ROOT_TOPIC = f"pandai/v1/{self.client_id}"
         
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=self.client_id)
         
@@ -45,12 +49,12 @@ class MQTTClient:
             print(f"[MQTT] Successfully connected to broker")
             self.connected = True
             
-            # Subscribe to necessary topics
-            self.subscribe("pandai/v1/bio/raw")
-            self.subscribe("pandai/v1/system/safety")
-            self.subscribe("pandai/v1/actuator/tdcs")
-            self.subscribe("pandai/v1/history/request")
-            self.subscribe("pandai/v1/control/camera")
+            # Subscribe to necessary topics (Unique to this device ID)
+            self.subscribe(f"{self.ROOT_TOPIC}/bio/raw")
+            self.subscribe(f"{self.ROOT_TOPIC}/system/safety")
+            self.subscribe(f"{self.ROOT_TOPIC}/actuator/tdcs")
+            self.subscribe(f"{self.ROOT_TOPIC}/history/request")
+            self.subscribe(f"{self.ROOT_TOPIC}/control/camera")
         else:
             print(f"[MQTT] Connection failed with code {reason_code}")
             
@@ -91,7 +95,7 @@ class MQTTClient:
         if not self.connected:
             return False
             
-        topic = "pandai/v1/bio/processed"
+        topic = f"{self.ROOT_TOPIC}/bio/processed"
         
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
