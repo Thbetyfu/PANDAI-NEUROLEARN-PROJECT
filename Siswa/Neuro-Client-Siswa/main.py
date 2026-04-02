@@ -2,6 +2,8 @@ import customtkinter as ctk
 import os
 import tkinter as tk
 import sys
+import time
+import threading
 
 from core.exceptions import PandaiCriticalError, VisionCriticalError, HardwareCriticalError, CloudCriticalError
 from core.integrity_manager import IntegrityManager
