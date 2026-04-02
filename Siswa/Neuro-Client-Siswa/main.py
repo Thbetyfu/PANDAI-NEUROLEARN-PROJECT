@@ -40,6 +40,7 @@ class NeuroClientApp(ctk.CTk):
         # 1. Initialize Managers
         self.integrity_manager = None
         self.security_token = False
+        self.selected_camera_index = 0 # Default camera
 
         # App State
         self.user_name = "Mozart"
@@ -98,17 +99,15 @@ class NeuroClientApp(ctk.CTk):
         try:
             self.init_core_systems()
             # A. PRE-STARTUP INTEGRITY GUARD
-            try:
-                self.run_integrity_check()
-                self.security_token = True
-                print("[Security] 🛡️ Integrity Check Passed. Security Token Issued.")
-                self.select_page("Beranda") 
-            except PandaiCriticalError as e:
-                print(f"[CRITICAL] 💀 [{e.code}] {e.message}")
-                self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})")
-                return 
+            self.run_integrity_check()
+            self.security_token = True
+            print("[Security] 🛡️ Integrity Check Passed. Security Token Issued.")
+            self.select_page("Beranda") 
+        except PandaiCriticalError as e:
+             self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})", error_code=e.code)
+             return
         except Exception as e: 
-             self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}")
+             self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}", error_code="SYS_ERR")
              return
 
         # Final Status
@@ -121,9 +120,9 @@ class NeuroClientApp(ctk.CTk):
         # Menggunakan Static Method sesuai saran Audit (Pola Stateless Audit)
         IntegrityManager.perform_boot_check(self.vision, self.serial, self.mqtt)
 
-    def show_panic_screen(self, message):
+    def show_panic_screen(self, message, error_code=None):
         """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""
-        panic_overlay = ctk.CTkFrame(self, fg_color="#F43F5E", corner_radius=0)
+        panic_overlay = ctk.CTkFrame(self, fg_color="#1E293B" if error_code == "E01" else "#F43F5E", corner_radius=0)
         panic_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
         panic_overlay.lift()
 
@@ -133,28 +132,92 @@ class NeuroClientApp(ctk.CTk):
         container = ctk.CTkFrame(panic_overlay, fg_color="transparent")
         container.place(relx=0.5, rely=0.5, anchor="center")
 
-        ctk.CTkLabel(container, text="🚨 SYSTEM PANIC 🚨", font=ctk.CTkFont(size=48, weight="bold"), text_color="white").pack(pady=20)
-        ctk.CTkLabel(container, text="PROTEKSI INTEGRITAS KOGNITIF AKTIF", font=ctk.CTkFont(size=20, weight="bold"), text_color="#FFD1D8").pack()
+        title = "🔍 KONFIGURASI KAMERA" if error_code == "E01" else "🚨 SYSTEM PANIC 🚨"
+        ctk.CTkLabel(container, text=title, font=ctk.CTkFont(size=40, weight="bold"), text_color="white").pack(pady=20)
         
-        error_box = ctk.CTkFrame(container, fg_color="#991B1B", corner_radius=16)
-        error_box.pack(pady=40, padx=20, fill="both")
+        # Error Content
+        error_box = ctk.CTkFrame(container, fg_color="#334155" if error_code == "E01" else "#991B1B", corner_radius=16)
+        error_box.pack(pady=20, padx=20, fill="both")
         
         ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(size=18), text_color="white", wraplength=500, justify="center", padx=30, pady=30).pack()
 
-        ctk.CTkLabel(container, text="Sistem PANDAI menolak berjalan tanpa validasi hardware yang aman.", font=ctk.CTkFont(size=14, slant="italic"), text_color="white").pack()
-        
-        btn_fix = ctk.CTkButton(
-            container, text="Keluarkankan Aplikasi & Periksa Kabel", 
-            fg_color="white", text_color="#F43F5E", hover_color="#F1F5F9",
-            height=50, font=ctk.CTkFont(weight="bold"),
-            command=self.on_closing
-        )
-        btn_fix.pack(pady=40)
+        # --- CAMERA PICKER (Show only if E01) ---
+        if error_code == "E01":
+            ctk.CTkLabel(container, text="Pilih kamera yang tersedia di bawah ini:", font=ctk.CTkFont(weight="bold"), text_color="white").pack(pady=(20, 10))
+            
+            # Mendeteksi kamera
+            available_cameras = VisionEngine.list_available_cameras()
+            options = [f"Kamera {i}" for i in available_cameras] if available_cameras else ["Tidak Ada Kamera Terdeteksi"]
+            
+            self.cam_dropdown = ctk.CTkOptionMenu(
+                container, values=options, 
+                width=300, height=45, fg_color="#475569", 
+                button_color="#64748B", dropdown_fg_color="#334155",
+                command=self._on_camera_selected
+            )
+            self.cam_dropdown.pack(pady=10)
+            
+            btn_retry = ctk.CTkButton(
+                container, text="Mulai Ulang Dengan Kamera Ini", 
+                fg_color="#10B981", text_color="white", hover_color="#059669",
+                height=50, width=300, font=ctk.CTkFont(weight="bold"),
+                command=lambda: self._restart_system_with_camera()
+            )
+            btn_retry.pack(pady=30)
+        else:
+            btn_fix = ctk.CTkButton(
+                container, text="Keluar & Periksa Kabel", 
+                fg_color="white", text_color="#F43F5E", hover_color="#F1F5F9",
+                height=50, font=ctk.CTkFont(weight="bold"),
+                command=self.on_closing
+            )
+            btn_fix.pack(pady=40)
 
-    def init_core_systems(self):
+    def _on_camera_selected(self, choice):
+        """Set index berdasarkan pilihan dropdown."""
+        try:
+            self.selected_camera_index = int(choice.split(" ")[1])
+            print(f"[UI] Kamera {self.selected_camera_index} dipilih.")
+        except:
+            pass
+
+    def _restart_system_with_camera(self):
+        """Mematikan semua sistem lama (jika ada) dan mulai ulang core."""
+        print(f"[RESTART] Mencoba booting ulang dengan Kamera {self.selected_camera_index}...")
+        # Cleanup
+        if hasattr(self, 'vision') and self.vision:
+             self.vision.stop()
+        if hasattr(self, 'engine'):
+             self.engine.stop()
+
+        # Restart
+        try:
+            self.init_core_systems(camera_index=self.selected_camera_index)
+            self.run_integrity_check()
+            self.security_token = True
+            
+            # Hapus overlay panic if success
+            for child in self.winfo_children():
+                if isinstance(child, ctk.CTkFrame) and child.cget("fg_color") in ["#1E293B", "#F43F5E"]:
+                    child.destroy()
+            
+            self.sidebar.nav_frame.grid() # Kembalikan sidebar
+            self.select_page("Beranda")
+            print("[Security] 🛡️ Lockdown Diangkat. Kamera Terhubung.")
+        except PandaiCriticalError as e:
+            # Tetap di panic screen dengan pesan baru
+            print(f"[RESTART] Gagal: {e.message}")
+            self.show_panic_screen(f"Gagal Hubungkan: {e.message} (Kode: {e.code})", error_code=e.code)
+        except Exception as e:
+            self.show_panic_screen(f"Fatal Error: {e}", error_code="SYS_ERR")
+
+    def init_core_systems(self, camera_index=None):
         print("="*60)
         print("  PANDAI NEUROLEARN 2.0 — Core Systems Startup")
         print("="*60)
+
+        # Gunakan index yang dipassing atau default
+        cam_idx = camera_index if camera_index is not None else self.selected_camera_index
 
         # 1. MQTT (The Bridge to Dashboard)
         self.mqtt = MQTTClient(broker_host=config.MQTT_BROKER, broker_port=config.MQTT_PORT)
@@ -167,7 +230,7 @@ class NeuroClientApp(ctk.CTk):
         self.serial = SerialClient(port="COM3") 
 
         # 3. Vision Engine (The Eyes — EAR via Kamera)
-        self.vision = VisionEngine(camera_index=0)
+        self.vision = VisionEngine(camera_index=cam_idx)
         self.vision.start()
 
         # 4. Local AI (Ollama)
