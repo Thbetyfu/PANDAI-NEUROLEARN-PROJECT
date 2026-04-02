@@ -225,9 +225,14 @@ class NeuroClientApp(ctk.CTk):
         # Give a small time for MQTT connect
         time.sleep(0.5)
 
-        # 2. Serial Client (The Bridge to ESP32)
-        # Unified SerialClient secara otomatis menangani MOCK/REAL via config
-        self.serial = SerialClient(port="COM3") 
+        # 2. Serial Client (The Bridge to ESP32) — [NON-AKTIF / COMMENTED]
+        """
+        CATATAN PENGEMBANG (BIOMETRIC HARDWARE):
+        Jika headset biometrik sudah ada, uncomment baris bawah dan pastikan 
+        port COM3 sesuai atau gunakan detektor port otomatis.
+        """
+        self.serial = None
+        # self.serial = SerialClient(port="COM3") 
 
         # 3. Vision Engine (The Eyes — EAR via Kamera)
         self.vision = VisionEngine(camera_index=cam_idx)

@@ -210,15 +210,15 @@ class DecisionEngine:
         should_print = (now - self.last_print_time) >= 1.5
         
         # --- A. AMIGDALA SHIELD (Safety Priority) ---
-        # 1. Skin Impedance Safety
-        if self.impedance > 50000:
-             self._trigger_emergency("IMPEDANSI TINGGI")
-             return
+        # 1. Skin Impedance Safety (COMMENTED: No Hardware Yet)
+        # if self.impedance > 50000:
+        #      self._trigger_emergency("IMPEDANSI TINGGI")
+        #      return
 
-        # 2. Heart Rate Safety (README Spec: HR > 130 bpm)
-        if self.current_hr > 130:
-             self._trigger_emergency(f"HR KRITIS ({self.current_hr} BPM)")
-             return
+        # 2. Heart Rate Safety (COMMENTED: No Hardware Yet)
+        # if self.current_hr > 130:
+        #      self._trigger_emergency(f"HR KRITIS ({self.current_hr} BPM)")
+        #      return
 
         # --- B. COGNITIVE CLASSIFICATION ---
         # 1. Detect CONFUSION (High Stress Spike + Dropping EAR)
@@ -266,10 +266,15 @@ class DecisionEngine:
         self.current_state = state
         self.tdcs_ma = tdcs_val
         
-        # Command Hardware Synchronously
-        if self.serial:
-            self.serial.send_command("SET_CURRENT", tdcs_val)
-            self.serial.send_command("SET_LIGHT", lamp_cmd)
+        # Command Hardware Synchronously (COMMENTED: No Hardware Yet)
+        """
+        CATATAN HARDWARE (ACTUATORS):
+        Aktifkan baris di bawah ini untuk mengirim perintah fisik ke ESP32
+        jika sudah tersedia (Headset tDCS & Lampu Cerdas).
+        """
+        # if self.serial:
+        #     self.serial.send_command("SET_CURRENT", tdcs_val)
+        #     self.serial.send_command("SET_LIGHT", lamp_cmd)
         
         # Sync with Dashboard
         if self.mqtt_client and self.mqtt_client.connected:

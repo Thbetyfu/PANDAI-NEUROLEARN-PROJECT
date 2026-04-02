@@ -71,17 +71,26 @@ class VisionEngine:
     def list_available_cameras():
         """
         Mendeteksi semua indeks kamera yang tersedia di sistem.
-        Mencoba indeks 0-5 secara berurutan.
+        Mencoba beberapa backend (DSHOW & MSMF) untuk kompatibilitas Windows.
         """
         available = []
         # Kita cek hingga index 5 (biasanya cukup untuk laptop + webcam eksternal)
         for i in range(6):
-            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW) # Menggunakan DSHOW untuk Windows agar lebih cepat detect
+            # Coba backend DirectShow (Cepat di Windows)
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
             if cap is not None and cap.isOpened():
                 success, _ = cap.read()
                 if success:
                     available.append(i)
                 cap.release()
+                continue
+            
+            # Fallback ke backend default jika DSHOW gagal
+            cap = cv2.VideoCapture(i)
+            if cap is not None and cap.isOpened():
+                available.append(i)
+                cap.release()
+                
         return available
 
     # ================================================================
