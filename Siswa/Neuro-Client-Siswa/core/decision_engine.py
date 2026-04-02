@@ -72,6 +72,7 @@ class DecisionEngine:
         # [NEW] MQTT Callbacks
         if self.mqtt:
             self.mqtt.add_callback("pandai/v1/history/request", self._handle_history_request)
+            self.mqtt.add_callback("pandai/v1/control/camera", self._handle_camera_control)
 
     def start(self):
         print(f"[Engine] 🧠 Neuro-Architect Protocol Berjalan (Sesi: {self.session_id})")
@@ -84,6 +85,24 @@ class DecisionEngine:
         if self.vision and not self.vision.is_running:
             self.vision.start()
         threading.Thread(target=self._run_loop, daemon=True).start()
+
+    def _handle_camera_control(self, topic, data):
+        """Menerima index kamera baru dari Browser/Dashboard."""
+        try:
+            # Handle JSON dict or raw string/int
+            idx_val = data.get("index") if isinstance(data, dict) else data
+            new_idx = int(idx_val)
+            
+            if self.vision:
+                print(f"[Engine] 🔄 Switching Camera to Index: {new_idx}")
+                # Hentikan kamera lama
+                self.vision.stop()
+                # Update index
+                self.vision.camera_index = new_idx
+                # Start lagi
+                self.vision.start()
+        except Exception as e:
+            print(f"[Engine] Camera switch failed: {e}")
 
     def stop(self):
         self.running = False
@@ -314,7 +333,8 @@ class DecisionEngine:
              "attention_index": round(att_score, 2),
              "cognitive_load": round(self.cognitive_load, 2),
              "state": self.current_state,
-             "identity_verified": getattr(self.vision, 'identity_verified', True)
+             "identity_verified": getattr(self.vision, 'identity_verified', True),
+             "available_cameras": self.vision.get_available_cameras() if self.vision else []
         }
 
         # 2. Citra Anak (Emotion & Gaze)

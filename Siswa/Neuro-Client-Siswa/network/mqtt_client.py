@@ -50,6 +50,7 @@ class MQTTClient:
             self.subscribe("pandai/v1/system/safety")
             self.subscribe("pandai/v1/actuator/tdcs")
             self.subscribe("pandai/v1/history/request")
+            self.subscribe("pandai/v1/control/camera")
         else:
             print(f"[MQTT] Connection failed with code {reason_code}")
             

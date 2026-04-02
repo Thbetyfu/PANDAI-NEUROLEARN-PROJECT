@@ -7,32 +7,22 @@ export function useNeuroListener() {
     const [isSimulating, setIsSimulating] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const simTimer = useRef(null);
+    const mqttClientRef = useRef(null);
 
     useEffect(() => {
         let client = null;
         let isMounted = true;
 
         if (isSimulating) {
-            // MODE SIMULASI: Dummy data yang berubah-ubah untuk demo tanpa alat
-            console.log('[NeuroListener] Mode Simulasi Aktif');
-            setIsConnected(true);
-
-            let idx = 0;
-            simTimer.current = setInterval(() => {
-                // Hanya timer dummy, data beneran dipicu fungsi triggerSimulation
-            }, 5000);
-
+            // ...
         } else {
-            // MODE REAL-TIME MQTT
-            console.log('[NeuroListener] Menghubungkan ke Broker Mosquitto (WebSocket port 9001)...');
-
-            // Terhubung ke Public Broker (SSL layer untuk keandalan browser)
-            const wsUrl = 'wss://broker.emqx.io:8084/mqtt';
+            console.log('[NeuroListener] Menghubungkan ke Broker Mosquitto Local (WebSocket port 9001)...');
+            const wsUrl = 'ws://localhost:9001'; 
             client = mqtt.connect(wsUrl);
+            mqttClientRef.current = client;
 
             client.on('connect', () => {
                 if (!isMounted || client.disconnecting) return;
-                console.log('[NeuroListener] ✅ Terhubung ke MQTT Broker');
                 setIsConnected(true);
                 client.subscribe('pandai/v1/bio/processed');
             });
@@ -41,19 +31,10 @@ export function useNeuroListener() {
                 if (!isMounted) return;
                 try {
                     const payload = JSON.parse(message.toString());
-                    if (payload.payload && payload.payload.metrics) {
-                        const metrics = payload.payload.metrics;
+                    const metrics = payload.payload?.metrics || payload.metrics;
+                    if (metrics) {
                         setBioData(metrics);
-
-                        // Mapping state dari DecisionEngine Neuro-Client (Python)
-                        if (metrics.state) {
-                            setNeuroState(metrics.state);
-                        } else {
-                            // Fallback mapping if 'state' wasn't present
-                            if (metrics.hrv_rmssd_ms < 20) setNeuroState('FATIGUE');
-                            else if (metrics.ear_score < 0.24) setNeuroState('DROWSY');
-                            else setNeuroState('NORMAL');
-                        }
+                        if (metrics.state) setNeuroState(metrics.state);
                     }
                 } catch (error) {
                     console.error('[NeuroListener] Error parsing message:', error);
@@ -70,21 +51,29 @@ export function useNeuroListener() {
             });
         }
 
+        const currentClient = client;
+
         return () => {
             isMounted = false;
             if (simTimer.current) clearInterval(simTimer.current);
-            if (client) {
-                client.end(true); // force close
-            }
+            if (currentClient) currentClient.end(true);
+            mqttClientRef.current = null;
         };
     }, [isSimulating]);
 
-    // Fungsi untuk memicu perubahan di Mode Simulasi (Fase 3.1 Testing)
     const triggerSimulation = (stateName) => {
         setIsSimulating(true);
         setNeuroState(stateName);
-        console.log(`[NeuroListener] Trigger Simulasi: ${stateName}`);
     };
 
-    return { neuroState, bioData, isSimulating, setIsSimulating, triggerSimulation, isConnected };
+    const switchCamera = (index) => {
+        if (mqttClientRef.current && isConnected) {
+            console.log(`[NeuroListener] Sending camera switch command to index: ${index}`);
+            mqttClientRef.current.publish('pandai/v1/control/camera', JSON.stringify({ index }));
+        } else {
+            console.warn('[NeuroListener] Cannot switch camera: MQTT client not connected');
+        }
+    };
+
+    return { neuroState, bioData, isSimulating, setIsSimulating, triggerSimulation, isConnected, switchCamera };
 }

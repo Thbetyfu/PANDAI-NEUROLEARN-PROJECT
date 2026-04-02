@@ -63,9 +63,19 @@ class VisionEngine:
         # --- Anti-Cheat / Identity ---
         self.reference_signature   = None
         self.identity_verified     = True
-        self.identity_mismatch_frames = 0
         self.no_face_frames        = 0
         self.camera_ready          = False
+        self._available_cameras    = []
+        self._last_cam_scan        = 0
+
+    def get_available_cameras(self):
+        """Ambil list kamera yang terdeteksi (dengan throttling scan)."""
+        now = time.time()
+        # Scan perdana atau tiap 5 detik
+        if not self._available_cameras or (now - self._last_cam_scan > 5.0):
+            self._available_cameras = self.list_available_cameras()
+            self._last_cam_scan = now
+        return self._available_cameras
 
     @staticmethod
     def list_available_cameras():
