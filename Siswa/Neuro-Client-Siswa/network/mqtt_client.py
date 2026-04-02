@@ -123,8 +123,8 @@ class MQTTClient:
         """Send emergency stop signal"""
         if self.connected:
             print("[MQTT] 🚨 SENDING EMERGENCY OFF 🚨")
-            self.client.publish("pandai/v1/actuator/tdcs", "EMERGENCY_OFF", qos=2)
-            self.client.publish("pandai/v1/system/safety", "EMERGENCY_OFF", qos=2)
+            self.client.publish(f"{self.ROOT_TOPIC}/actuator/tdcs", "EMERGENCY_OFF", qos=2)
+            self.client.publish(f"{self.ROOT_TOPIC}/system/safety", "EMERGENCY_OFF", qos=2)
 
     def publish(self, topic, payload):
         """Generic publish method."""

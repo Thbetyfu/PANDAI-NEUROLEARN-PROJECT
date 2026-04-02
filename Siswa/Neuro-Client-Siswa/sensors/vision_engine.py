@@ -58,6 +58,7 @@ class VisionEngine:
         # --- Citra Anak (Emosi + Gaze) ---
         self.current_emotion = "NEUTRAL"
         self.pupil_coords    = {"x": 0.5, "y": 0.5}
+        self.face_detected   = False
         self.frame_count     = 0        # FPS throttle counter
 
         # --- Anti-Cheat / Identity ---
@@ -67,6 +68,7 @@ class VisionEngine:
         self.camera_ready          = False
         self._available_cameras    = []
         self._last_cam_scan        = 0
+        self.last_update_tick      = time.time()
 
     def get_available_cameras(self):
         """Ambil list kamera yang terdeteksi (dengan throttling scan)."""
@@ -259,15 +261,20 @@ class VisionEngine:
         LEFT_EYE  = self.LEFT_EYE
         RIGHT_EYE = self.RIGHT_EYE
 
+        print(f"[Vision] 🎞️ Thread loop started for index {self.camera_index}")
         while self.is_running:
             try:
+                # 1. Capture Frame (TIMEOUT Check point)
+                # print("[DEBUG-VISION] -> Reading frame...")
                 success, frame = self.cap.read()
-                if not success:
+                
+                if not success or frame is None:
                     print("[VISION] ⚠️ Gagal mendapat gambar dari kamera. Mencoba lagi...")
                     time.sleep(1)
                     continue
 
-                # Optimasi: writeable=False sebelum diproses MediaPipe
+                # 2. Process MediaPipe
+                # print("[DEBUG-VISION] -> Processing MediaPipe...")
                 frame.flags.writeable = False
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results   = self.face_mesh.process(frame_rgb)
@@ -277,6 +284,8 @@ class VisionEngine:
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                 if results.multi_face_landmarks:
+                    with self._lock:
+                        self.face_detected = True
                     self.no_face_frames = 0
                     mesh = results.multi_face_landmarks[0].landmark
 
@@ -310,11 +319,18 @@ class VisionEngine:
                             print(f"[VisionEngine] Citra Anak Error: {e_citra}")
                         self.frame_count = 0
                 else:
+                    with self._lock:
+                        self.face_detected = False
                     self.no_face_frames += 1
                     self.current_emotion = "OFF-CAMERA"
-                    if self.no_face_frames > 15:
+                    if self.no_face_frames > 30:
                         with self._lock:
                             self.ear_score = 0.0
+
+                # Commit frame ke buffer (thread-safe)
+                pil_frame = Image.fromarray(frame_rgb)
+                # Update Watchdog (Deteksi freeze)
+                self.last_update_tick = time.time()
 
                 # Commit frame ke buffer (thread-safe)
                 pil_frame = Image.fromarray(frame_rgb)
@@ -352,6 +368,11 @@ class VisionEngine:
         if not self.cap:
             return False
         return self.cap.isOpened() and self.is_running
+        
+    def is_face_detected(self) -> bool:
+        """Sinyal apakah wajah terlihat untuk sinkronisasi dashboard."""
+        with self._lock:
+            return self.face_detected
 
     def get_citra_anak(self) -> dict:
         """Data emosi + gaze untuk dikirim via MQTT."""

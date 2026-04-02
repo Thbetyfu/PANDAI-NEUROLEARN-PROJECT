@@ -661,30 +661,30 @@ class BerandaPage(ctk.CTkFrame):
     def _spawn_overlay(self):
         """
         Membuat dan menampilkan Floating HUD + Camera Widget.
-        
-        Dipanggil saat sesi belajar dimulai.
-        Safety: Menggunakan try/except agar app tidak crash jika 
-        overlay gagal dibuat (misalnya karena driver kamera error).
         """
+        if not self.session_active:
+            return
+
         from components.overlay_hud import FloatingHUD, CameraWidget
         
-        # Spawn Floating HUD (panel status di atas layar)
+        # 1. Spawn Floating HUD
         try:
+            print("[Beranda] 🖥️ Spawning Floating HUD...")
             self.hud_ref = FloatingHUD(self.winfo_toplevel())
-            print("  -> Floating HUD aktif")
         except Exception as e:
-            print(f"  -> HUD gagal: {e}")
+            print(f"[Beranda] ❌ HUD Error: {e}")
             self.hud_ref = None
         
-        # Spawn Camera Widget — gunakan VisionEngine yang sudah berjalan
-        # agar tidak ada 2 proses OpenCV membuka kamera yang sama (Windows crash!)
+        # 2. Spawn Camera Widget
         try:
+            print("[Beranda] 📷 Spawning Camera PiP...")
+            # Ambil ref vision dari engine
             vision_ref = getattr(self, 'engine', None)
-            vision_ref = getattr(vision_ref, 'vision_engine', None) if vision_ref else None
+            vision_ref = getattr(vision_ref, 'vision', None) if vision_ref else None
+            
             self.cam_ref = CameraWidget(self.winfo_toplevel(), vision_engine=vision_ref)
-            print("  -> Kamera monitoring aktif")
         except Exception as e:
-            print(f"  -> Kamera gagal: {e}")
+            print(f"[Beranda] ❌ Camera Widget Error: {e}")
             self.cam_ref = None
 
     def _destroy_overlay(self):

@@ -18,6 +18,9 @@ class MovingAverage:
         if not self.queue:
             return default
         return sum(self.queue) / len(self.queue)
+        
+    def clear(self):
+        self.queue.clear()
 
 class DecisionEngine:
     def __init__(self, mqtt_client=None, serial_client=None, ai_client=None, vision_engine=None, mode="hybrid"):
@@ -67,12 +70,14 @@ class DecisionEngine:
         self.ear_loss_timestamp = None 
         self.last_data_timestamp = time.time() # Watchdog: Data Freshness (Fast)
         self.last_audit_timestamp = time.time() # Integrity: System Audit (Slow)
-        self.db_save_timer = 0 # Throttle DB write to 1fps
+        self.db_save_timer = 0
+        self.engine_error = None  # Capture critical errors for UI reporting
+ # Throttle DB write to 1fps
 
-        # [NEW] MQTT Callbacks
+        # [NEW] MQTT Callbacks (Sync with ROOT_TOPIC for isolation)
         if self.mqtt:
-            self.mqtt.add_callback("pandai/v1/history/request", self._handle_history_request)
-            self.mqtt.add_callback("pandai/v1/control/camera", self._handle_camera_control)
+            self.mqtt.add_callback(f"{self.mqtt.ROOT_TOPIC}/history/request", self._handle_history_request)
+            self.mqtt.add_callback(f"{self.mqtt.ROOT_TOPIC}/control/camera", self._handle_camera_control)
 
     def start(self):
         print(f"[Engine] 🧠 Neuro-Architect Protocol Berjalan (Sesi: {self.session_id})")
@@ -151,6 +156,7 @@ class DecisionEngine:
 
             except PandaiCriticalError as e:
                 print(f"[Engine] Runtime Critical Error: {e}")
+                self.engine_error = e # Simpan untuk UI utama
                 self._trigger_emergency(str(e))
                 self.running = False
             except ZeroDivisionError:
@@ -175,7 +181,11 @@ class DecisionEngine:
         if (now - self.last_data_timestamp) > 5.0:
             raise HardwareCriticalError("E02", "WATCHDOG: Aliran data biometrik terhenti (Frozen) > 5 detik.")
 
-        # 2. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
+        # 3. Vision Watchdog: Deteksi Kamera Beku/Frozen (> 10.0 detik)
+        if self.vision and (now - self.vision.last_update_tick > 10.0):
+             raise VisionCriticalError("E05", "KAMERA TERKUNCI (FROZEN): Frame tidak diupdate > 10 detik. Hal ini bisa terjadi karena CPU sibuk (Next.js sedanga compile) atau driver kamera hang.")
+
+        # 4. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
         if (now - self.last_audit_timestamp) > 5.0:
             IntegrityManager.check_health(self.vision, self.serial, self.mqtt)
             self.last_audit_timestamp = now
@@ -261,7 +271,7 @@ class DecisionEngine:
             self._trigger_ai("STRESS")
 
         # 0. Detect Identity Mismatch (Anti-Cheat)
-        if hasattr(self.vision_engine, 'identity_verified') and not self.vision_engine.identity_verified:
+        if hasattr(self.vision, 'identity_verified') and not self.vision.identity_verified:
             if self.current_state != "IDENTITY_LOCK":
                 self._update_state("IDENTITY_LOCK", 0.0, "#000000|100") # Dark alert - Cut tDCS
                 self.db.log_intervention("SECURITY_ALERT", "Mismatch Identitas Siswa")
@@ -333,6 +343,7 @@ class DecisionEngine:
              "attention_index": round(att_score, 2),
              "cognitive_load": round(self.cognitive_load, 2),
              "state": self.current_state,
+             "face_detected": self.vision.is_face_detected() if self.vision else False,
              "identity_verified": getattr(self.vision, 'identity_verified', True),
              "available_cameras": self.vision.get_available_cameras() if self.vision else []
         }

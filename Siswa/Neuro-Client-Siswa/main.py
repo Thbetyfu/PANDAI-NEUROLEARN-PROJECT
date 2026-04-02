@@ -114,10 +114,24 @@ class NeuroClientApp(ctk.CTk):
              self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}", error_code="SYS_ERR")
              return
 
+        # 8. RUNTIME HEALTH MONITOR
+        self.check_runtime_health()
+
         # Final Status
         print("="*60)
-        print("  Core Systems: INITIALIZED & ONLINE")
+        print("  Core Systems: INITIALIZED & ONLINE & MONITORING")
         print("="*60)
+
+    def check_runtime_health(self):
+        """Monitor berkala untuk menangkap error dari engine (Background Thread)."""
+        if hasattr(self, 'engine') and self.engine and self.engine.engine_error:
+            err = self.engine.engine_error
+            print(f"[UI] 🚨 MENANGKAP ERROR RUNTIME DARI ENGINE: {err}")
+            self.show_panic_screen(f"Terjadi Gangguan Sistem Saat Sesi Berlangsung:\n\n{err.message}\n\n(Kode: {err.code})", error_code=err.code)
+            return # Hentikan monitor jika sudah panic
+            
+        # Terus monitor tiap 2 detik
+        self.after(2000, self.check_runtime_health)
 
     def run_integrity_check(self):
         """Standardized Health Check via IntegrityManager [E01-E03]."""
@@ -128,10 +142,8 @@ class NeuroClientApp(ctk.CTk):
         """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""
         panic_overlay = ctk.CTkFrame(self, fg_color="#1E293B" if error_code == "E01" else "#F43F5E", corner_radius=0)
         panic_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
-        panic_overlay.lift()
-
         # Disable all background interaction
-        self.sidebar.nav_frame.grid_remove() # Hilangkan menu navigasi
+        self.sidebar.nav_frame.grid_remove()
         
         container = ctk.CTkFrame(panic_overlay, fg_color="transparent")
         container.place(relx=0.5, rely=0.5, anchor="center")
@@ -142,8 +154,25 @@ class NeuroClientApp(ctk.CTk):
         # Error Content
         error_box = ctk.CTkFrame(container, fg_color="#334155" if error_code == "E01" else "#991B1B", corner_radius=16)
         error_box.pack(pady=20, padx=20, fill="both")
-        
+
         ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(size=18), text_color="white", wraplength=500, justify="center", padx=30, pady=30).pack()
+
+        # --- ACTION BUTTONS (Recovery Mode) ---
+        actions = ctk.CTkFrame(container, fg_color="transparent")
+        actions.pack(pady=20)
+
+        if error_code == "E05": # If Frozen
+            ctk.CTkButton(actions, text="🔄 RESET KAMERA", fg_color="#10B981", hover_color="#059669", 
+                          height=45, corner_radius=10, font=ctk.CTkFont(weight="bold"),
+                          command=lambda: self._handle_camera_reset(panic_overlay)).pack(side="left", padx=10)
+
+        ctk.CTkButton(actions, text="❌ KELUAR APLIKASI", fg_color="#475569", hover_color="#334155", 
+                      height=45, corner_radius=10, font=ctk.CTkFont(weight="bold"),
+                      command=self.quit).pack(side="left", padx=10)
+                      
+        # Info Tambahan
+        ctk.CTkLabel(container, text="Tips: Pastikan Dashboard LMS di browser sudah selesai 'Compiling' (100%)\nuntuk mengurangi beban CPU kamera.", 
+                     font=ctk.CTkFont(size=12), text_color="#CBD5E1").pack(pady=10)
 
         # --- CAMERA PICKER (Show only if E01) ---
         if error_code == "E01":
@@ -290,6 +319,42 @@ class NeuroClientApp(ctk.CTk):
             self._last_width = event.width
             self._last_height = event.height
             self.generate_and_place_aura()
+
+    def _handle_camera_reset(self, overlay_to_remove):
+        """Mencoba menghidupkan kembali kamera yang beku/freeze."""
+        print("[UI] 🔄 Mencoba memulihkan kamera...")
+        try:
+            # 1. Stop Loop & Engine
+            if hasattr(self, 'engine'):
+                self.engine.running = False
+                if self.engine.vision:
+                    self.engine.vision.stop()
+                    
+            # 2. Reset Status & Error
+            self.engine.engine_error = None
+            self.engine.running = True
+            
+            # 3. Re-start Vision (Background Thread)
+            if self.engine.vision:
+                self.engine.vision.start()
+            
+            # 4. Re-start Engine Thread
+            import threading
+            self.engine_thread = threading.Thread(target=self.engine._run_loop, daemon=True)
+            self.engine_thread.start()
+            
+            # 5. Kembalikan Sidebar & Hapus Overlay
+            self.sidebar.nav_frame.grid()
+            overlay_to_remove.destroy()
+            
+            # 6. Lanjutkan Monitor Health
+            self.check_runtime_health()
+            
+            print("[UI] ✅ Kamera berhasil di-reset.")
+            
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Gagal Reset", f"Kamera gagal dipulihkan: {e}")
 
     def generate_and_place_aura(self):
         """Generates a high-quality PIL gradient image adaptive to current window width"""
