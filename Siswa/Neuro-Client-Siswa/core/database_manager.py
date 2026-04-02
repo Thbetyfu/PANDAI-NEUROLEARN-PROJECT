@@ -125,3 +125,28 @@ class DatabaseManager:
         except Exception as e:
             print(f"[DATABASE] ⚠️ Tabel korup atau error tak terduga: {e}")
             return []
+
+    def get_recent_summary(self, limit=10):
+        """Mengambil ringkasan teks dari N data terakhir untuk input AI context."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=2.0)
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT attention_index, cognitive_load, emotion_state 
+                FROM biometric_logs 
+                ORDER BY timestamp DESC LIMIT ?
+            ''', (limit,))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows: return "Data stabil"
+            
+            # Format: 'Avg Focus: 85%, Emotion: HAPPY'
+            avg_att = sum(r[0] for r in rows) / len(rows)
+            avg_load = sum(r[1] for r in rows) / len(rows)
+            emotions = [r[2] for r in rows]
+            dom_emotion = max(set(emotions), key=emotions.count)
+            
+            return f"Fokus Rata-rata: {int(avg_att*100)}%, Beban Kognitif: {int(avg_load)}%, Emosi Dominan: {dom_emotion}"
+        except Exception:
+            return "Pola belajar sedang dianalisis"

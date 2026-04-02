@@ -307,6 +307,7 @@ class DecisionEngine:
              "hr_bpm": round(self.current_hr, 1),
              "ear_score": round(self.current_ear, 3),
              "attention_index": round(att_score, 2),
+             "cognitive_load": round(self.cognitive_load, 2),
              "state": self.current_state,
              "identity_verified": getattr(self.vision, 'identity_verified', True)
         }
@@ -378,13 +379,16 @@ class DecisionEngine:
             
         if self.ai_client:
             self.last_ai_trigger = now
-            threading.Thread(target=self._fetch_and_print_ai, args=(condition,), daemon=True).start()
+            # Ambil konteks historis singkat dari DB
+            history_ctx = self.db.get_recent_summary(limit=5)
+            threading.Thread(target=self._fetch_and_print_ai, args=(condition, history_ctx), daemon=True).start()
 
-    def _fetch_and_print_ai(self, condition):
+    def _fetch_and_print_ai(self, condition, history_ctx):
         try:
-             saran = self.ai_client.get_suggestion(condition=condition)
-             print(f"\n🧠 [PANDAI AI Core]: {saran}\n")
-        except:
+             saran = self.ai_client.get_suggestion(condition=condition, history_context=history_ctx)
+             print(f"\n🧠 [PROFESOR PANDAI]: {saran}\n")
+        except Exception as e:
+             # print(f"AI Fetch Error: {e}")
              pass
 
     def _handle_history_request(self, topic, data):
