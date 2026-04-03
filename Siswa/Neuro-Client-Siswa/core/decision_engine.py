@@ -118,115 +118,102 @@ class DecisionEngine:
              self.vision.stop()
 
     def _run_loop(self):
+        print("[Engine] 🛡️ Watchdog System Active.")
+        
+        last_pub = 0
+        last_state = self.current_state
+        
         while self.running:
-            try: # 🛡️ BEMPER UTAMA DIMULAI DI SINI
-                # 0. Runtime Integrity Check (Medical Safety Loop)
+            now = time.time()
+            try:
+                # 0. Runtime Checks
                 self._check_runtime_integrity()
 
-                # 1. Update data dari Vision (Eye Tracking)
+                # 1. Update Vision Data
                 if self.vision:
-                    raw_ear = self.vision.get_ear()
-                    self.ear_ma.add(raw_ear)
-                    self.current_ear = self.ear_ma.get(default=0.5)
+                    self.current_ear = self.vision.get_ear()
+                    self.ear_ma.add(self.current_ear)
 
-                # 2. Update data dari Serial (Biometrics dari ESP32)
+                # 2. Update Serial Data
                 if self.serial:
-                    bio_data = self.serial.get_bio_data()
-                    if bio_data:
-                        # Raw Values
-                        raw_gsr = bio_data.get('gsr', self.current_gsr)
-                        raw_hrv = bio_data.get('hrv', self.current_hrv)
-                        self.current_hr = bio_data.get('hr', self.current_hr)
-                        self.impedance = bio_data.get('imp', self.impedance)
-                        
-                        # Processed Values (Moving Average untuk stabilitas)
-                        self.gsr_ma.add(raw_gsr)
-                        self.hrv_ma.add(raw_hrv)
-                        
-                        self.prev_gsr = self.current_gsr
-                        self.current_gsr = self.gsr_ma.get()
-                        self.current_hrv = self.hrv_ma.get()
-                        self.last_data_timestamp = time.time() # Reset Watchdog Timer
+                    bio = self.serial.get_bio_data()
+                    if bio:
+                        self.current_gsr = bio.get('gsr', self.current_gsr)
+                        self.current_hr = bio.get('hr', self.current_hr)
+                        self.last_data_timestamp = now
 
-                # 3. Intelligent State Evaluation (The Brain core)
+                # 3. Decision Logic
                 self._evaluate_cognitive_state()
 
-                # 4. Telemetry (Fast response 10fps)
-                self._publish_telemetry()
+                # 4. Smart Telemetry (Throttled but Instant on State Change)
+                state_changed = self.current_state != last_state
+                if state_changed or (now - last_pub) > 0.2: # 5 FPS max for bio-data
+                    self._publish_telemetry()
+                    last_pub = now
+                    last_state = self.current_state
 
-                # 5. Intelligent Buffer (Averaging every 5 seconds)
+                # 5. History Buffer
                 self._handle_buffering()
 
-            except PandaiCriticalError as e:
-                print(f"[Engine] Runtime Critical Error: {e}")
-                self.engine_error = e # Simpan untuk UI utama
-                self._trigger_emergency(str(e))
-                self.running = False
-            except ZeroDivisionError:
-                print("[ENGINE] ⚠️ Terjadi pembagian dengan nol saat menghitung rata-rata.")
-            except KeyError as e:
-                print(f"[ENGINE] ⚠️ Format data tidak sesuai, kehilangan kunci: {e}")
             except Exception as e:
-                # 🛡️ JARING PENGAMAN TERAKHIR
-                # Menangkap SEMUA jenis error agar loop utama tidak pernah mati!
-                print(f"\n[ENGINE] 🚨 KESALAHAN FATAL DI LOOP UTAMA: {e}")
-                print("[ENGINE] 🔄 Sistem memulihkan diri otomatis dalam 1 detik...\n")
-                time.sleep(1) # Beri waktu istirahat agar tidak nge-spam terminal
+                print(f"[Engine-ERR] {e}")
+                time.sleep(1.0)
             
-            # Istirahat 0.1 detik wajib ada di luar try-except
-            time.sleep(0.1)
+            # High frequency internal loop (20hz) but throttled I/O
+            time.sleep(0.05)
 
     def _check_runtime_integrity(self):
         """Watchdog: Gabungan pengecekan data beku (Fast) & audit sistemik (Slow)."""
         now = time.time()
         
-        # 1. Biometric Watchdog: Hanya aktif jika sensor Fisik (Headset) terhubung
+        # 1. Biometric Watchdog
         if self.serial and (now - self.last_data_timestamp) > 10.0:
-            raise HardwareCriticalError("E02", "WATCHDOG BIOMETRIK: Aliran data terhenti > 10 detik. Periksa alat PANDAI.")
+            raise HardwareCriticalError("E02", "WATCHDOG BIOMETRIK: Aliran data terhenti > 10 detik.")
 
-        # 3. Vision Watchdog: Deteksi Kamera Beku/Frozen 
-        # [V9] SKIP CHECK JIKA SUSPENDED (User sedang minimize aplikasi)
+        # 3. Vision Watchdog: Skip check jika suspended (Minimize)
         if self.is_suspended:
-            # Tetap reset tick agar saat di-restore tidak langsung kena timeout
             if self.vision:
-                self.vision.last_update_tick = time.time()
+                self.vision.last_update_tick = now
             return
 
         if self.vision and (now - self.vision.last_update_tick > 30.0):
-             # [V18.7] Jangan lempar error jika vision sedang mencoba memulihkan diri (Scanner aktif)
              if not getattr(self.vision, 'is_recovering', False):
-                raise VisionCriticalError("E05", "KAMERA TIDAK MERESPON: Frame gagal diupdate selama 30 detik terakhir.")
+                raise VisionCriticalError("E05", "KAMERA TIDAK MERESPON: Frame gagal diupdate.")
 
-        # 4. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
-        # [V22.2] Jangan lakukan audit jika sistem sedang di-suspend (Minimize)
+        # 4. Slow Systemic Audit (tiap 5 detik)
         if (now - self.last_audit_timestamp) > 5.0:
             if not self.is_suspended:
                 IntegrityManager.check_health(self.vision, self.serial, self.mqtt)
             self.last_audit_timestamp = now
 
         try:
-            # 3. Vision Granular Check (EAR Suicide)
+            # 3. Vision Recovery Loop (Edisi Hipersensitif v25.8.2)
             if self.vision and not self.is_suspended:
                 raw_ear = self.vision.get_ear()
-                if raw_ear == 0.0 or raw_ear is None:
+                face_present = self.vision.is_face_detected()
+                # [V25.9.7] ULTRA SENSITIVITY: Lock if EAR is too low (eyes closed/missing) or face lost
+                if raw_ear < 0.1 or raw_ear is None or not face_present:
                     if self.ear_loss_timestamp is None:
                         self.ear_loss_timestamp = now
-                    elif (now - self.ear_loss_timestamp) > 5.0:
-                        raise VisionCriticalError("E01", "KONTROL VISI HILANG: Kamera tidak mendeteksi mata > 5 detik.")
+                    # Micro-Debounce (0.2s) to prevent noise-flicker
+                    elif (now - self.ear_loss_timestamp) > 0.2:
+                        if self.current_state != "VISION_LOST":
+                            print("[Engine] 🛡️ Sinyal Visi Hilang - Mengunci LMS...")
+                            self._update_state("VISION_LOST", 0.0, "#FF0000|100")
                 else:
                     self.ear_loss_timestamp = None
+                    # INSTANT RECOVERY
+                    if self.current_state == "VISION_LOST":
+                        print("[Engine] ✨ Wajah Terdeteksi - Memulihkan Sistem...")
+                        self._update_state("FLOW", 1.5, "#E0F7FA|50")
                     
-        except VisionCriticalError as e:
-             raise e
-        except HardwareCriticalError as e:
-             raise e
-        except CloudCriticalError as e:
-             raise e
         except PandaiCriticalError as e:
             self.is_healthy = False
             self.error_message = str(e)
             self._trigger_emergency(self.error_message)
             raise e
+        except Exception as e:
+            print(f"[Engine] Watchdog Warning: {e}")
 
     def reset_baselines(self):
         """Mereset semua rata-rata bergerak untuk kalibrasi ulang (Manual atau tiap Sesi)."""
@@ -462,5 +449,5 @@ class DecisionEngine:
         }
         
         if self.mqtt:
-            self.mqtt.publish("pandai/v1/history/response", response_payload)
+            self.mqtt.publish(f"{self.mqtt.ROOT_TOPIC}/history/response", response_payload)
             print(f"[Engine] 📤 Riwayat {days} Hari Telah Dikirim.")

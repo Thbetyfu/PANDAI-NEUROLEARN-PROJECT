@@ -391,13 +391,15 @@ class NeuroClientApp(ctk.CTk):
 
     def on_window_resize(self, event):
         """Handle dynamic background scaling and layout adjustments."""
-        # [V14] Filter: Hanya trigger jika windows utama yang berganti ukuran
-        if event.widget == self and (event.width != self._last_width or event.height != self._last_height):
-             # Ignore very small values (minimize transitions)
+        # [V25.9.2] SILK PERFORMANCE: Throttle aura redraw to avoid main-thread congestion during drag
+        if event.widget == self and (abs(event.width - self._last_width) > 50 or abs(event.height - self._last_height) > 50):
              if event.width > 200 and event.height > 200:
                  self._last_width = event.width
                  self._last_height = event.height
-                 self.generate_and_place_aura()
+                 # Defer aura draw using 'after' to keep drag operation smooth
+                 if hasattr(self, "_aura_after_id"):
+                     self.after_cancel(self._aura_after_id)
+                 self._aura_after_id = self.after(100, self.generate_and_place_aura)
 
     def _handle_camera_reset(self, overlay_to_remove):
         """Mencoba menghidupkan kembali kamera yang beku/freeze."""
@@ -449,29 +451,33 @@ class NeuroClientApp(ctk.CTk):
         ch = 362 # Background height stays fixed at top area
         
         # Create gradient image that spans full current width
-        gradient = Image.new('RGB', (cw, ch), "#F8F8F8")
-        draw = ImageDraw.Draw(gradient)
+        # [V26.0.1] OPTIMIZED SPRITE RENDERING: Drawing 1xH then stretching is 100x faster than line-loops
+        grad_img = Image.new("RGBA", (1, ch), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(grad_img)
         
-        start_color = (123, 166, 255) # #7BA6FF
-        end_color = (248, 248, 248)   # #F8F8F8
+        start_color = (123, 166, 255, 255) # #7BA6FF
+        end_color = (248, 248, 248, 255)   # #F8F8F8
         
         for y in range(ch):
             r = int(start_color[0] + (end_color[0] - start_color[0]) * (y / ch))
             g = int(start_color[1] + (end_color[1] - start_color[1]) * (y / ch))
             b = int(start_color[2] + (end_color[2] - start_color[2]) * (y / ch))
-            draw.line([(0, y), (cw, y)], fill=(r, g, b))
+            alpha = int(start_color[3] + (end_color[3] - start_color[3]) * (y / ch))
+            draw.point((0, y), fill=(r, g, b, alpha))
+            
+        # Stretch horizontally (Silk Mode)
+        aura_img = grad_img.resize((cw, ch), Image.NEAREST)
         
         # [V10] Safety Check: Ensure parent container exists and window is not minimized
-        if not self.main_container.winfo_exists() or self.state() == "iconic":
+        if not self.main_container.winfo_exists() or self.state() == "iconic" or cw < 1 or ch < 1:
             return
 
-        # Convert to CTkImage
-        self.aura_img = ctk.CTkImage(light_image=gradient, dark_image=gradient, size=(cw, ch))
+        self.aura_image = ctk.CTkImage(light_image=aura_img, dark_image=aura_img, size=(cw, ch))
         
         try:
             # Safety Check: Ensure widget still exists before configuring
             if not hasattr(self, "aura_label") or not self.aura_label.winfo_exists():
-                self.aura_label = ctk.CTkLabel(self.main_container, image=self.aura_img, text="", fg_color="transparent")
+                self.aura_label = ctk.CTkLabel(self.main_container, image=self.aura_image, text="", fg_color="transparent")
                 self.aura_label.place(x=0, y=80)
                 self.aura_label.lower()
             else:

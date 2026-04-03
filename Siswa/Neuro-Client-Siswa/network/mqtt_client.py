@@ -111,23 +111,38 @@ class MQTTClient:
                     callback(topic, payload)
 
     def publish_processed_bio(self, session_id, metrics, hardware_state):
-        """[V25.4.2] Full Integrity Payload — Unlocks LMS Security Overlay."""
+        """[V25.5] Hybrid Compatibility Payload — Supports both Modern & Legacy LMS components."""
         if not self.connected: return False
         topic = f"{self.ROOT_TOPIC}/bio/processed"
         
-        # [V25.4.2] Mapping all fields required by GlobalIntervention.js and useNeuroListener.js
-        payload = {
-            "device_id": self.client_id,
-            "session_id": session_id,
+        # [V25.5] Prepare the metrics structure
+        # DecisionEngine uses 'ear_score' and 'gsr_microsiemens'
+        processed_metrics = {
             "focus_level": metrics.get("focus_level", metrics.get("ear_score", 0.5)),
             "stress_level": metrics.get("stress_level", metrics.get("gsr_microsiemens", 0.0)),
             "attention_index": metrics.get("attention_index", 0.0),
-            "face_detected": metrics.get("face_detected", False),       # REQUIRED TO UNLOCK UI
-            "available_cameras": metrics.get("available_cameras", []), # REQUIRED FOR DROPDOWN
-            "is_drowsy": metrics.get("is_drowsy", False),
-            "is_bored": metrics.get("is_bored", False),
-            "status": metrics.get("state", "NORMAL"),                  # Sync state
-            "timestamp": time.time()
+            "face_detected": metrics.get("face_detected", False),
+            "available_cameras": metrics.get("available_cameras", []),
+            "ear_score": metrics.get("ear_score", 0.5), # Legacy mapping
+            "cognitive_load": metrics.get("cognitive_load", 0.0), # Legacy mapping
+            "emotion": metrics.get("emotion", "NEUTRAL"),
+            "gaze_coords": metrics.get("gaze_coords", {"x": 0.5, "y": 0.5}),
+            "state": metrics.get("state", "NORMAL"),
+            "status": metrics.get("state", "NORMAL") # Unified with status key
+        }
+
+        # [V25.5] HYBRID STRUCTURE: Flat for Modern, Nested for Legacy
+        payload = {
+            "device_id": self.client_id,
+            "session_id": session_id,
+            "timestamp": time.time(),
+            # Legacy Nesting (Required by ProfileScreen.jsx)
+            "payload": {
+                "metrics": processed_metrics,
+                "hardware": hardware_state
+            },
+            # Modern Flattening (Required by GlobalIntervention.js)
+            **processed_metrics
         }
         
         return self.publish(topic, payload, qos=0)

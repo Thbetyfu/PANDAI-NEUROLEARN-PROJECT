@@ -34,6 +34,11 @@ class VisionEngine:
     Mengaktifkan kembali otak AI setelah jalur hardware stabil.
     """
     def __init__(self, camera_index=0):
+        # [V26.0] Optimized Performance State
+        self._cached_cameras = []
+        self._last_camera_scan = 0
+        self._frame_cache = {} # [V26.0.7] Cache for UI frames
+        
         # 1. Pipeline Control
         self.frame_queue = queue.Queue(maxsize=1) 
         self.monitor = ResourceMonitor(cpu_limit=85)
@@ -141,8 +146,13 @@ class VisionEngine:
 
     def _process_loop(self):
         """Thread Pengolah AI MediaPipe (Otak System)."""
+        target_fps = 30 # [V26.0.2] Optimization: Don't exceed human/screen limits
+        frame_time = 1.0 / target_fps
+        
         while self.is_running:
-            time.sleep(self.monitor.get_adaptive_sleep())
+            loop_start = time.time()
+            time.sleep(max(0, self.monitor.get_adaptive_sleep()))
+            
             try:
                 frame = self.frame_queue.get(timeout=1.0)
                 if frame is None: continue
@@ -165,32 +175,53 @@ class VisionEngine:
                         self.ear_score = (l_v + r_v) / 2.0
                 else:
                     self.no_face_frames += 1
-                    if self.no_face_frames > 20:
+                    # [V25.9] QUANTUM SENSITIVITY: Instant lock on first missing frame
+                    if self.no_face_frames > 0:
                         with self._lock:
                             self.face_detected = False
                             self._last_mesh = None
-                            self.ear_score = 0.5
+                            self.ear_score = 0.0 # [V25.9.6] Force 0.0 for instant lock signal
+                
+                # [V26.0] SILK PERFORMANCE: FPS Limiter for CPU health
+                elapsed = time.time() - loop_start
+                wait = frame_time - elapsed
+                if wait > 0:
+                    time.sleep(wait)
             except: continue
 
     def _dist(self, p1, p2):
         return ((p1.x - p2.x)**2 + (p1.y - p2.y)**2)**0.5
 
     def get_frame(self, target_size=(640, 480)):
+        # [V26.0.7] TEMPORAL CACHE: Avoid redundant renders if multiple UI elements poll
+        now = time.time()
+        cache_key = f"{target_size[0]}x{target_size[1]}"
+        if cache_key in self._frame_cache:
+            last_ts, cached_img = self._frame_cache[cache_key]
+            if (now - last_ts) < 0.04: # 25 FPS UI limit
+                return cached_img
+
         with self._raw_frame_lock:
             if self._latest_raw_frame is None:
                 return Image.new("RGB", target_size, (15, 23, 42))
             img = self._latest_raw_frame.copy()
 
         try:
+             # Fast Resize
              res = cv2.resize(img, target_size)
              img_rgb = cv2.cvtColor(res, cv2.COLOR_BGR2RGB)
+             
              with self._lock: mesh = self._last_mesh
              if mesh:
                  h, w = target_size[1], target_size[0]
+                 # [CPU-PRO] Optimasi: Gunakan integer casting di luar loop jika memungkinkan
                  for idx in self.LEFT_EYE + self.RIGHT_EYE:
                      p = mesh[idx]
                      cv2.circle(img_rgb, (int(p.x * w), int(p.y * h)), 1, (79, 70, 229), -1)
-             return Image.fromarray(img_rgb)
+             
+             pil_final = Image.fromarray(img_rgb)
+             self._frame_cache[cache_key] = (now, pil_final)
+             return pil_final
         except:
              return Image.new("RGB", target_size, (15, 23, 42))
 
@@ -201,17 +232,45 @@ class VisionEngine:
     def is_face_detected(self):
         with self._lock: return self.face_detected
     def get_citra_anak(self):
-        return {"emotion": "NEUTRAL", "gaze_coords": {"x": 0.5, "y": 0.5}}
+        """[V26.2] DYNAMIC GAZE TRACKING: Projections of face orientation into 0.0-1.0 coords."""
+        with self._lock:
+            mesh = self._last_mesh
+            if not mesh:
+                return {"emotion": "NEUTRAL", "gaze_coords": {"x": 0.5, "y": 0.5}}
+            
+            # Simple gaze estimation based on nose (landmark 1) relative to mesh boundaries
+            # Higher precision can be added using iris landmarks later
+            p = mesh[1] # Tip of nose
+            # Map nose x/y into 0-1 range based on average face width/height in frame
+            # (Heuristic calibrated for standard webcam distance)
+            gx = max(0.0, min(1.0, 1.0 - p.x)) # Inverse horizontally
+            gy = max(0.0, min(1.0, p.y))
+            
+            return {
+                "emotion": "NEUTRAL", 
+                "gaze_coords": {"x": round(gx, 2), "y": round(gy, 2)}
+            }
     def set_reference_identity(self):
         return True
     def get_available_cameras(self):
-        return self.list_available_cameras()
+        # [V26.0.4] HIGH-PERFORMANCE CACHING: HW Scans are too slow for 100ms loops (Windows blocking)
+        now = time.time()
+        if (now - self._last_camera_scan) > 10.0 or not self._cached_cameras:
+            self._cached_cameras = self.list_available_cameras()
+            self._last_camera_scan = now
+        return self._cached_cameras
+
     @staticmethod
     def list_available_cameras():
         avail = []
-        for i in range(4):
-            c = cv2.VideoCapture(i)
-            if c.isOpened(): avail.append(i); c.release()
+        # Scanning cameras is a HEAVY blocking process on Windows
+        for i in range(2): # Only check 0 then 1 (common) to minimize blocking
+            try:
+                c = cv2.VideoCapture(i)
+                if c.isOpened():
+                    avail.append(i)
+                    c.release()
+            except: pass
         return avail
     def stop(self):
         self.is_running = False

@@ -40,6 +40,9 @@ class FloatingHUD(tk.Toplevel):
 
     def __init__(self, master: ctk.CTk | None = None, **kwargs):
         super().__init__(master)
+        
+        # [V26.0.6] Render Optimization: Skip redundant draws
+        self._last_rendered_score = -1
 
         # --- Window Properties (Frameless, Always On Top) ---
         self.overrideredirect(True)
@@ -267,9 +270,14 @@ class FloatingHUD(tk.Toplevel):
         y = self.winfo_y() + event.y - self._drag_y
         self.geometry(f"+{x}+{y}")
 
-    def update_flow_score(self, score: int):
-        """Public API to update the flow score dynamically."""
-        self._render_flow_score(score)
+    def update_flow_score(self, score: float):
+        """Public API to update the flow score dynamically (Integer-only throttle)."""
+        rounded = int(score) # Rounding handles flickering better
+        if rounded == self._last_rendered_score:
+            return # Skip redraw (CPU SAVED)
+        
+        self._last_rendered_score = rounded
+        self._render_flow_score(rounded)
 
     def update_insight(self, text: str):
         """Public API to update the insight text dynamically."""
