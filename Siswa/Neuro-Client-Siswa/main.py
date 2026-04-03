@@ -41,6 +41,16 @@ class NeuroClientApp(ctk.CTk):
         self.geometry("1440x1024")
         self.configure(fg_color=COLOR_APP_BG)
 
+        # [STRICT FOCUS] SET CPU PRIORITY TO HIGH
+        # Memastikan Windows memberikan resource maksimal ke Neuro-Client
+        import psutil
+        try:
+            p = psutil.Process(os.getpid())
+            p.nice(psutil.HIGH_PRIORITY_CLASS)
+            print("[STRICT] 🚀 CPU Priority Set to HIGH.")
+        except Exception as e:
+            print(f"[STRICT] ⚠️ Gagal mengatur prioritas CPU: {e}")
+
         # 1. Initialize Managers
         self.integrity_manager = None
         self.security_token = False
@@ -59,24 +69,27 @@ class NeuroClientApp(ctk.CTk):
         self.sidebar = SidebarFrame(self, select_page_callback=self.select_page)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        # 2. MAIN CONTENT AREA
-        self.main_container = ctk.CTkFrame(self, fg_color=COLOR_APP_BG, corner_radius=0)
+        # 2. MAIN CONTENT AREA (The Body)
+        # Parent: self (The App), Column: 1
+        self.main_container = ctk.CTkFrame(self, fg_color="#F8FAFC", corner_radius=0)
         self.main_container.grid(row=0, column=1, sticky="nsew")
-        self.main_container.grid_rowconfigure(1, weight=1)
+        self.main_container.grid_rowconfigure(1, weight=1) # View Container area
         self.main_container.grid_columnconfigure(0, weight=1)
+        
+        # [V11] Force early geometry for Aura calculation
+        self.update_idletasks()
 
-        # --- RECTANGLE 403: THE BLUE AURA (IMAGE-BASED FOR RELIABILITY) ---
-        self.generate_and_place_aura()
-
-        # 3. HEADER Component (80px height)
+        # 3. HEADER & VIEW CONTAINER (Children of Main Container)
         self.header = HeaderFrame(self.main_container)
         self.header.grid(row=0, column=0, sticky="ew")
 
-        # 4. VIEW CONTAINER (Switching Pages)
         self.view_container = ctk.CTkFrame(self.main_container, fg_color="transparent", corner_radius=0)
         self.view_container.grid(row=1, column=0, sticky="nsew")
-        self.view_container.grid_columnconfigure(0, weight=1)
         self.view_container.grid_rowconfigure(0, weight=1)
+        self.view_container.grid_columnconfigure(0, weight=1)
+
+        # 4. AURA BACKGROUND
+        self.generate_and_place_aura()
 
         # 5. INITIALIZE PAGES
         self.pages = {
@@ -94,22 +107,23 @@ class NeuroClientApp(ctk.CTk):
         self.view_container.lift()
         self.header.lift()
 
-        # 6. RESPONSIVE BINDING
+        # 6. RESPONSIVE & LIFECYCLE BINDING
         self._last_width = 0
         self._last_height = 0
         self.bind("<Configure>", self.on_window_resize)
+        # [V9] NEW: UCD LIFECYCLE MANAGEMENT (Fix E05 minimization lock)
+        self.bind("<Map>", self.on_window_restore)
+        self.bind("<Unmap>", self.on_window_minimize)
 
-        # 7. INIT BACKGROUND SYSTEMS
+        # 7. ASYNC CORE STARTUP (UCD: Modern Splash)
         try:
             self.init_core_systems()
-            # A. PRE-STARTUP INTEGRITY GUARD
-            self.run_integrity_check()
-            self.security_token = True
-            print("[Security] 🛡️ Integrity Check Passed. Security Token Issued.")
-            self.select_page("Beranda") 
-        except PandaiCriticalError as e:
-             self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})", error_code=e.code)
-             return
+            # [V11] Professional Splash Transition:
+            # Berikan sinyal bahwa sistem sedang menyiapkan keamanan
+            self.header.set_title("Inisialisasi...")
+            
+            import threading
+            threading.Thread(target=self._async_boot_guard, daemon=True).start()
         except Exception as e: 
              self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}", error_code="SYS_ERR")
              return
@@ -133,78 +147,107 @@ class NeuroClientApp(ctk.CTk):
         # Terus monitor tiap 2 detik
         self.after(2000, self.check_runtime_health)
 
+    def _async_boot_guard(self):
+        """[V10] Thread worker untuk integrity check."""
+        try:
+            self.run_integrity_check()
+            # Jika berhasil, pindahkan kembali ke UI thread
+            self.after(0, self._on_boot_success)
+        except PandaiCriticalError as e:
+            self.after(0, lambda: self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})", error_code=e.code))
+        except Exception as e:
+            self.after(0, lambda: self.show_panic_screen(f"Fatal Startup Error: {e}", error_code="BOOT_FAIL"))
+
+    def _on_boot_success(self):
+        self.security_token = True
+        print("[Security] 🛡️ Integrity Check Passed. Moving to Dashboard.")
+        
+        # [V11] FORCE UI REFRESH
+        # Pastikan Aura (Pelangi) dibuat meskipun windows tidak menembakkan resize event
+        self.update_idletasks()
+        self.generate_and_place_aura()
+        
+        self.select_page("Beranda")
+
     def run_integrity_check(self):
         """Standardized Health Check via IntegrityManager [E01-E03]."""
-        # Menggunakan Static Method sesuai saran Audit (Pola Stateless Audit)
         IntegrityManager.perform_boot_check(self.vision, self.serial, self.mqtt)
 
     def show_panic_screen(self, message, error_code=None):
         """Halaman UI 'Panic' yang menutupi seluruh layar jika terjadi Dosa Besar."""
-        panic_overlay = ctk.CTkFrame(self, fg_color="#1E293B" if error_code == "E01" else "#F43F5E", corner_radius=0)
+        # Theme: E01/E05/E03 = Sidebar configuration style, ELSE = Critical Alert style
+        is_recoverable = error_code in ["E01", "E05", "E03"]
+        bg_color = "#0F172A" if is_recoverable else "#991B1B"
+        
+        panic_overlay = ctk.CTkFrame(self, fg_color=bg_color, corner_radius=0)
         panic_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
-        # Disable all background interaction
+        
+        # Disable background interaction
         self.sidebar.nav_frame.grid_remove()
         
         container = ctk.CTkFrame(panic_overlay, fg_color="transparent")
         container.place(relx=0.5, rely=0.5, anchor="center")
 
-        title = "🔍 KONFIGURASI KAMERA" if error_code == "E01" else "🚨 SYSTEM PANIC 🚨"
-        ctk.CTkLabel(container, text=title, font=ctk.CTkFont(size=40, weight="bold"), text_color="white").pack(pady=20)
+        # Icons based on error
+        icon = "📷" if error_code in ["E01", "E05"] else ("☁️" if error_code == "E03" else "🚨")
+        ctk.CTkLabel(container, text=icon, font=ctk.CTkFont(size=64)).pack(pady=(0, 20))
+
+        title = "KONFIGURASI KAMERA" if error_code in ["E01", "E05"] else ("HUBUNGKAN CLOUD" if error_code == "E03" else "GANGGUAN SISTEM")
+        ctk.CTkLabel(container, text=title, font=ctk.CTkFont(family="Space Grotesk", size=42, weight="bold"), text_color="white").pack(pady=10)
         
-        # Error Content
-        error_box = ctk.CTkFrame(container, fg_color="#334155" if error_code == "E01" else "#991B1B", corner_radius=16)
+        error_box = ctk.CTkFrame(container, fg_color="#1E293B", corner_radius=24, border_width=1, border_color="#334155")
         error_box.pack(pady=20, padx=20, fill="both")
 
-        ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(size=18), text_color="white", wraplength=500, justify="center", padx=30, pady=30).pack()
+        ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(family="Inter", size=18), 
+                     text_color="#CBD5E1", wraplength=600, justify="center", padx=40, pady=40).pack()
 
-        # --- ACTION BUTTONS (Recovery Mode) ---
-        actions = ctk.CTkFrame(container, fg_color="transparent")
-        actions.pack(pady=20)
+        # --- RECOVERY ZONE ---
+        recovery_zone = ctk.CTkFrame(container, fg_color="transparent")
+        recovery_zone.pack(pady=20, fill="x")
 
-        if error_code == "E05": # If Frozen
-            ctk.CTkButton(actions, text="🔄 RESET KAMERA", fg_color="#10B981", hover_color="#059669", 
-                          height=45, corner_radius=10, font=ctk.CTkFont(weight="bold"),
-                          command=lambda: self._handle_camera_reset(panic_overlay)).pack(side="left", padx=10)
-
-        ctk.CTkButton(actions, text="❌ KELUAR APLIKASI", fg_color="#475569", hover_color="#334155", 
-                      height=45, corner_radius=10, font=ctk.CTkFont(weight="bold"),
-                      command=self.quit).pack(side="left", padx=10)
-                      
-        # Info Tambahan
-        ctk.CTkLabel(container, text="Tips: Pastikan Dashboard LMS di browser sudah selesai 'Compiling' (100%)\nuntuk mengurangi beban CPU kamera.", 
-                     font=ctk.CTkFont(size=12), text_color="#CBD5E1").pack(pady=10)
-
-        # --- CAMERA PICKER (Show only if E01) ---
-        if error_code == "E01":
-            ctk.CTkLabel(container, text="Pilih kamera yang tersedia di bawah ini:", font=ctk.CTkFont(weight="bold"), text_color="white").pack(pady=(20, 10))
+        # Camera Picker (Only for E01 or E05)
+        if error_code in ["E01", "E05"]:
+            ctk.CTkLabel(recovery_zone, text="Pilih kamera lain yang tersedia:", 
+                         font=ctk.CTkFont(family="Inter", size=14, weight="bold"), text_color="white").pack(pady=(10, 5))
             
-            # Mendeteksi kamera
-            available_cameras = VisionEngine.list_available_cameras()
-            options = [f"Kamera {i}" for i in available_cameras] if available_cameras else ["Tidak Ada Kamera Terdeteksi"]
+            available = VisionEngine.list_available_cameras()
+            options = [f"Kamera {i}" for i in available] if available else ["Tidak Ada Kamera Terdeteksi"]
             
             self.cam_dropdown = ctk.CTkOptionMenu(
-                container, values=options, 
-                width=300, height=45, fg_color="#475569", 
-                button_color="#64748B", dropdown_fg_color="#334155",
+                recovery_zone, values=options, 
+                width=340, height=48, fg_color="#334155", 
+                button_color="#475569", dropdown_fg_color="#0F172A",
+                corner_radius=12,
                 command=self._on_camera_selected
             )
             self.cam_dropdown.pack(pady=10)
             
-            btn_retry = ctk.CTkButton(
-                container, text="Mulai Ulang Dengan Kamera Ini", 
-                fg_color="#10B981", text_color="white", hover_color="#059669",
-                height=50, width=300, font=ctk.CTkFont(weight="bold"),
-                command=lambda: self._restart_system_with_camera()
-            )
-            btn_retry.pack(pady=30)
+            btn_row = ctk.CTkFrame(recovery_zone, fg_color="transparent")
+            btn_row.pack(pady=20)
+
+            ctk.CTkButton(btn_row, text="🔄 COBA LAGI SEKARANG", 
+                          fg_color="#4F46E5", text_color="white", hover_color="#4338CA",
+                          height=56, width=280, font=ctk.CTkFont(size=16, weight="bold"),
+                          corner_radius=16,
+                          command=self._restart_system_with_camera).pack(side="left", padx=10)
+        
+        elif error_code == "E03":
+            ctk.CTkButton(recovery_zone, text="🌐 HUBUNGKAN ULANG CLOUD", 
+                          fg_color="#10B981", text_color="white", hover_color="#059669",
+                          height=56, width=320, font=ctk.CTkFont(size=16, weight="bold"),
+                          corner_radius=16,
+                          command=self._restart_system_with_camera).pack(pady=10)
+            
+            ctk.CTkButton(recovery_zone, text="❌ KELUAR", fg_color="transparent", text_color="#94A3B8",
+                          command=self.quit).pack(pady=10)
         else:
-            btn_fix = ctk.CTkButton(
-                container, text="Keluar & Periksa Kabel", 
-                fg_color="white", text_color="#F43F5E", hover_color="#F1F5F9",
-                height=50, font=ctk.CTkFont(weight="bold"),
-                command=self.on_closing
-            )
-            btn_fix.pack(pady=40)
+            ctk.CTkButton(recovery_zone, text="❌ KELUAR APLIKASI", fg_color="#F43F5E", hover_color="#E11D48",
+                          height=50, width=240, font=ctk.CTkFont(weight="bold"), corner_radius=12,
+                          command=self.quit).pack()
+
+        # Footer Tips
+        ctk.CTkLabel(container, text="Tips: Pastikan kamera tidak sedang digunakan oleh Zoom, Teams, atau Browser.", 
+                     font=ctk.CTkFont(family="Inter", size=13), text_color="#94A3B8").pack(pady=20)
 
     def _on_camera_selected(self, choice):
         """Set index berdasarkan pilihan dropdown."""
@@ -215,34 +258,41 @@ class NeuroClientApp(ctk.CTk):
             pass
 
     def _restart_system_with_camera(self):
-        """Mematikan semua sistem lama (jika ada) dan mulai ulang core."""
-        print(f"[RESTART] Mencoba booting ulang dengan Kamera {self.selected_camera_index}...")
+        """Membangkitkan kembali sistem dari layar Panic (Non-blocking)."""
+        print(f"[RESTART] 🔄 Mencoba booting ulang dengan Kamera {self.selected_camera_index}...")
+        
         # Cleanup
         if hasattr(self, 'vision') and self.vision:
              self.vision.stop()
         if hasattr(self, 'engine'):
              self.engine.stop()
 
-        # Restart
         try:
+            # 1. Re-Init Hardware
             self.init_core_systems(camera_index=self.selected_camera_index)
-            self.run_integrity_check()
-            self.security_token = True
             
-            # Hapus overlay panic if success
-            for child in self.winfo_children():
-                if isinstance(child, ctk.CTkFrame) and child.cget("fg_color") in ["#1E293B", "#F43F5E"]:
-                    child.destroy()
+            # 2. Async Integrity Check [V10]
+            print("[RESTART] ⏳ Memulihkan koneksi kamera & cloud di background...")
+            import threading
+            threading.Thread(target=self._async_boot_guard, daemon=True).start()
             
-            self.sidebar.nav_frame.grid() # Kembalikan sidebar
-            self.select_page("Beranda")
-            print("[Security] 🛡️ Lockdown Diangkat. Kamera Terhubung.")
-        except PandaiCriticalError as e:
-            # Tetap di panic screen dengan pesan baru
-            print(f"[RESTART] Gagal: {e.message}")
-            self.show_panic_screen(f"Gagal Hubungkan: {e.message} (Kode: {e.code})", error_code=e.code)
         except Exception as e:
-            self.show_panic_screen(f"Fatal Error: {e}", error_code="SYS_ERR")
+            print(f"[RESTART] Fatal: {e}")
+            self.show_panic_screen(f"Gagal Pemulihan: {e}", error_code="SYS_FAIL")
+
+    def _on_boot_success(self):
+        self.security_token = True
+        print("[Security] 🛡️ Lockdown Diangkat. Pindah ke Dashboard.")
+        
+        # Hapus overlay panic if success (Recursively cleanup)
+        for child in self.winfo_children():
+            # Check for CTkFrame overlays starting with default naming
+            if isinstance(child, ctk.CTkFrame) and "!ctkframe" in child.winfo_name().lower():
+                  child.destroy()
+        
+        # Ensure Sidebar is visible
+        self.sidebar.nav_frame.grid()
+        self.select_page("Beranda")
 
     def init_core_systems(self, camera_index=None):
         print("="*60)
@@ -312,13 +362,32 @@ class NeuroClientApp(ctk.CTk):
             self.mqtt.disconnect()
         self.destroy()
 
+    def on_window_minimize(self, event):
+        """[STRICT-V9] Suspend monitoring saat di-minimize."""
+        # [V14] Filter: Hanya proses jika widget utama yang di-minimize, bukan sub-widget
+        if event.widget == self and hasattr(self, "engine") and self.engine:
+            print("[Lifecycle] 📉 Window Minimized. Suspending Watchdog...")
+            self.engine.is_suspended = True
+
+    def on_window_restore(self, event):
+        """[STRICT-V9] Resume monitoring saat diaktifkan kembali."""
+        # [V14] Filter: Hanya proses jika widget utama yang di-map
+        if event.widget == self and hasattr(self, "engine") and self.engine:
+            print("[Lifecycle] 📈 Window Restored. Resuming Watchdog...")
+            # [STRICT] Force heartbeat reset agar tidak kadaluarsa
+            if self.vision:
+                self.vision.last_update_tick = time.time()
+            self.engine.is_suspended = False
+
     def on_window_resize(self, event):
-        """Handle dynamic background scaling and layout adjustments for TV/Laptop focus"""
-        # Only trigger if dimensions actually changed (prevent recursion)
-        if event.width != self._last_width or event.height != self._last_height:
-            self._last_width = event.width
-            self._last_height = event.height
-            self.generate_and_place_aura()
+        """Handle dynamic background scaling and layout adjustments."""
+        # [V14] Filter: Hanya trigger jika windows utama yang berganti ukuran
+        if event.widget == self and (event.width != self._last_width or event.height != self._last_height):
+             # Ignore very small values (minimize transitions)
+             if event.width > 200 and event.height > 200:
+                 self._last_width = event.width
+                 self._last_height = event.height
+                 self.generate_and_place_aura()
 
     def _handle_camera_reset(self, overlay_to_remove):
         """Mencoba menghidupkan kembali kamera yang beku/freeze."""
@@ -345,7 +414,14 @@ class NeuroClientApp(ctk.CTk):
             
             # 5. Kembalikan Sidebar & Hapus Overlay
             self.sidebar.nav_frame.grid()
-            overlay_to_remove.destroy()
+            
+            # Deep Cleanup of overlays in Pages (prevent duplicates)
+            beranda = self.pages.get('Beranda')
+            if beranda and hasattr(beranda, '_destroy_overlay'):
+                beranda._destroy_overlay()
+            
+            if overlay_to_remove:
+                overlay_to_remove.destroy()
             
             # 6. Lanjutkan Monitor Health
             self.check_runtime_health()
@@ -378,47 +454,51 @@ class NeuroClientApp(ctk.CTk):
             b = int(start_color[2] + (end_color[2] - start_color[2]) * (y / ch))
             draw.line([(0, y), (cw, y)], fill=(r, g, b))
         
+        # [V10] Safety Check: Ensure parent container exists and window is not minimized
+        if not self.main_container.winfo_exists() or self.state() == "iconic":
+            return
+
         # Convert to CTkImage
         self.aura_img = ctk.CTkImage(light_image=gradient, dark_image=gradient, size=(cw, ch))
         
-        if not hasattr(self, "aura_label"):
-            self.aura_label = ctk.CTkLabel(self.main_container, image=self.aura_img, text="", fg_color="transparent")
-            self.aura_label.place(x=0, y=80)
-            self.aura_label.lower()
-        else:
-            self.aura_label.configure(image=self.aura_img)
+        try:
+            # Safety Check: Ensure widget still exists before configuring
+            if not hasattr(self, "aura_label") or not self.aura_label.winfo_exists():
+                self.aura_label = ctk.CTkLabel(self.main_container, image=self.aura_img, text="", fg_color="transparent")
+                self.aura_label.place(x=0, y=80)
+                self.aura_label.lower()
+            else:
+                self.aura_label.configure(image=self.aura_img)
+        except Exception as e:
+            print(f"[UI] Aura Draw Skip: {e}") # Silently ignore during transitions
 
     def select_page(self, name):
         # Update Sidebar Nav UI
-        self.sidebar.update_active_nav(name)
+        if self.sidebar and self.sidebar.winfo_exists():
+            self.sidebar.update_active_nav(name)
         
         # Update Header Title
-        self.header.set_title(name)
+        if self.header and self.header.winfo_exists():
+            self.header.set_title(name)
         
         # Switch Page Visibility
         for n, page in self.pages.items():
+            if not page.winfo_exists():
+                 continue
+                 
             if n == name:
-                page.grid()
-                # If scrollable, try to force transparency on internal canvas
                 try:
-                    if hasattr(page, "scroll_frame"):
+                    page.grid()
+                    # If scrollable, try to force transparency on internal canvas
+                    if hasattr(page, "scroll_frame") and page.scroll_frame.winfo_exists():
                         page.scroll_frame.configure(fg_color="transparent")
                 except:
                     pass
             else:
-                page.grid_remove()
-        # Update Sidebar Nav UI
-        self.sidebar.update_active_nav(name)
-        
-        # Update Header Title
-        self.header.set_title(name)
-        
-        # Switch Page Visibility
-        for n, page in self.pages.items():
-            if n == name:
-                page.grid()
-            else:
-                page.grid_remove()
+                try:
+                    page.grid_remove()
+                except:
+                    pass
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("Light")

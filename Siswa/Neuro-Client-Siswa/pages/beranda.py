@@ -661,16 +661,21 @@ class BerandaPage(ctk.CTkFrame):
     def _spawn_overlay(self):
         """
         Membuat dan menampilkan Floating HUD + Camera Widget.
+        Menggunakan pola Singleton (Idempotent) untuk mencegah duplikasi jendela (Bug: Multiple Cam Windows).
         """
         if not self.session_active:
             return
+
+        # 🛡️ PROTEKSI: Bersihkan jendela lama sebelum spawn baru
+        self._destroy_overlay()
 
         from components.overlay_hud import FloatingHUD, CameraWidget
         
         # 1. Spawn Floating HUD
         try:
             print("[Beranda] 🖥️ Spawning Floating HUD...")
-            self.hud_ref = FloatingHUD(self.winfo_toplevel())
+            parent = self.winfo_toplevel()
+            self.hud_ref = FloatingHUD(parent)
         except Exception as e:
             print(f"[Beranda] ❌ HUD Error: {e}")
             self.hud_ref = None
@@ -682,7 +687,8 @@ class BerandaPage(ctk.CTkFrame):
             vision_ref = getattr(self, 'engine', None)
             vision_ref = getattr(vision_ref, 'vision', None) if vision_ref else None
             
-            self.cam_ref = CameraWidget(self.winfo_toplevel(), vision_engine=vision_ref)
+            parent = self.winfo_toplevel()
+            self.cam_ref = CameraWidget(parent, vision_engine=vision_ref)
         except Exception as e:
             print(f"[Beranda] ❌ Camera Widget Error: {e}")
             self.cam_ref = None

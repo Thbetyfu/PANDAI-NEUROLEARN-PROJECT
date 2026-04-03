@@ -72,6 +72,7 @@ class DecisionEngine:
         self.last_audit_timestamp = time.time() # Integrity: System Audit (Slow)
         self.db_save_timer = 0
         self.engine_error = None  # Capture critical errors for UI reporting
+        self.is_suspended = False # [V9] Lifecycle Awareness (Fix E05 Minimization)
  # Throttle DB write to 1fps
 
         # [NEW] MQTT Callbacks (Sync with ROOT_TOPIC for isolation)
@@ -177,13 +178,20 @@ class DecisionEngine:
         """Watchdog: Gabungan pengecekan data beku (Fast) & audit sistemik (Slow)."""
         now = time.time()
         
-        # 1. Fast Watchdog: Deteksi sensor beku/macet (> 5.0 detik) sesuai Audit QA
-        if (now - self.last_data_timestamp) > 5.0:
-            raise HardwareCriticalError("E02", "WATCHDOG: Aliran data biometrik terhenti (Frozen) > 5 detik.")
+        # 1. Biometric Watchdog: Hanya aktif jika sensor Fisik (Headset) terhubung
+        if self.serial and (now - self.last_data_timestamp) > 10.0:
+            raise HardwareCriticalError("E02", "WATCHDOG BIOMETRIK: Aliran data terhenti > 10 detik. Periksa alat PANDAI.")
 
-        # 3. Vision Watchdog: Deteksi Kamera Beku/Frozen (> 10.0 detik)
-        if self.vision and (now - self.vision.last_update_tick > 10.0):
-             raise VisionCriticalError("E05", "KAMERA TERKUNCI (FROZEN): Frame tidak diupdate > 10 detik. Hal ini bisa terjadi karena CPU sibuk (Next.js sedanga compile) atau driver kamera hang.")
+        # 3. Vision Watchdog: Deteksi Kamera Beku/Frozen 
+        # [V9] SKIP CHECK JIKA SUSPENDED (User sedang minimize aplikasi)
+        if self.is_suspended:
+            # Tetap reset tick agar saat di-restore tidak langsung kena timeout
+            if self.vision:
+                self.vision.last_update_tick = time.time()
+            return
+
+        if self.vision and (now - self.vision.last_update_tick > 30.0):
+             raise VisionCriticalError("E05", "KAMERA TIDAK MERESPON: Frame gagal diupdate selama 30 detik terakhir.")
 
         # 4. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
         if (now - self.last_audit_timestamp) > 5.0:

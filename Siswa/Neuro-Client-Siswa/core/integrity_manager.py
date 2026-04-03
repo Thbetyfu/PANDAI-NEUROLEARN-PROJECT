@@ -1,4 +1,5 @@
 # Siswa/Neuro-Client-Siswa/core/integrity_manager.py
+import time
 from .exceptions import VisionCriticalError, HardwareCriticalError, CloudCriticalError
 import config
 
@@ -15,31 +16,35 @@ class IntegrityManager:
         """
         print("[GUARD] 🛡️ Menjalankan Pemeriksaan Integritas Sistem...")
         
-        # 1. Cek Vision (Kamera) — WAJIB AKTIF
-        if vision is None or not vision.is_camera_active():
+        # 1. Cek Vision (Kamera) — WAJIB AKTIF (Dengan Retry 3x)
+        vision_ok = False
+        for i in range(3):
+            if vision and vision.is_camera_active():
+                vision_ok = True
+                break
+            print(f"[GUARD] ⚠️ Kamera belum siap, mencoba ulang ({i+1}/3)...")
+            time.sleep(1.5)
+            
+        if not vision_ok:
             raise VisionCriticalError("E01", "Kamera tidak terdeteksi atau sistem vision tidak aktif.")
 
-        # 2. Cek Hardware (Serial/ESP32) — [NON-AKTIF / COMMENTED FOR NOW]
-        """
-        CATATAN PENGEMBANG (HARDWARE ALIGNMENT):
-        Bagian ini dinonaktifkan sementara karena fokus pada Fitur Vision (Kamera).
-        Jika Hardware (Headset biometrik & Lampu) sudah tersedia:
-        1. Uncomment baris di bawah ini.
-        2. Pastikan port COM sesuai di config.py atau deteksi otomatis ditambahkan.
-        3. Pastikan ESP32 mengirimkan data JSON yang valid ('gsr', 'hrv', 'hr').
-        """
-        # if not config.SIMULATION_MODE:
-        #     if not serial or not serial.connected:
-        #         raise HardwareCriticalError("E02", "Alat PANDAI (ESP32) tidak terdeteksi di Port USB.")
-        # else:
-        #     if not serial or not serial.connected:
-        #         raise HardwareCriticalError("E02", "Virtual Hardware ESP32 gagal inisialisasi.")
+        # 3. Cek Cloud (MQTT) — SEKARANG OPTIONAL (Graceful Degradation)
+        # Broker publik seperti EMQX membutuhkan waktu handshake yang bervariasi.
+        # [V6.1] Jika gagal terhubung, biarkan sistem berjalan dalam "Mode Offline"
+        cloud_ok = False
+        for i in range(3):
+            if mqtt and mqtt.is_connected():
+                cloud_ok = True
+                break
+            print(f"[GUARD] ⚠️ Koneksi Cloud (MQTT) belum siap, mencoba ulang ({i+1}/3)...")
+            time.sleep(2.0)
+            
+        if not cloud_ok:
+            print("[GUARD] 🌐 CLOUD OFFLINE: Gagal terhubung ke broker EMQX.")
+            print("[GUARD] 🛡️ Melanjutkan dalam MODE OFFLINE. Data akan disimpan secara lokal.")
+            # TIDAK LAGI melempar CloudCriticalError agar user tidak frustrasi.
 
-        # 3. Cek Cloud (MQTT) — WAJIB AKTIF (Untuk kirim sinyal ke Dashboard)
-        if not mqtt or not mqtt.is_connected():
-            raise CloudCriticalError("E03", "Gagal terhubung ke Cloud (MQTT). Jalur data terputus.")
-
-        print("[GUARD] ✅ Integritas Terverifikasi (Vision-Only Mode). Sistem Siap.")
+        print("[GUARD] ✅ Integritas Terverifikasi. Sistem Siap.")
         return True
 
     @staticmethod

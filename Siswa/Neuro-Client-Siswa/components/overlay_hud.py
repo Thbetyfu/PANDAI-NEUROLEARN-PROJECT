@@ -392,10 +392,9 @@ class CameraWidget(tk.Toplevel):
             return
 
         try:
-            pil_img = self.vision_engine.get_frame()
+            # [V7] Request SMALL frame directly to save CPU (No large resizes in UI thread)
+            pil_img = self.vision_engine.get_frame(target_size=(200, 140))
             if pil_img is not None:
-                # Scale ke ukuran widget
-                pil_img = pil_img.resize((200, 140))
                 ctk_img = ctk.CTkImage(
                     light_image=pil_img, dark_image=pil_img, size=(200, 140)
                 )

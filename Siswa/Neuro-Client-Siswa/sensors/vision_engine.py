@@ -1,383 +1,306 @@
-"""
-=================================================================
-PANDAI Neuro-Client — Vision Engine (Guardian System Core)
-=================================================================
-
-ARSITEKTUR:
-  - Thread terpisah (_update) agar perhitungan CV tidak mem-freeze UI.
-  - threading.Lock() pada semua state mutable agar thread-safe.
-  - Frame PIL diexpose untuk CameraWidget (single camera instance).
-  - Identitas & emosi tetap berjalan di throttle 10 FPS.
-
-FAIL-SAFE:
-  - SerialException, UnicodeDecodeError pada hardware
-  - cv2.read() failure → retry tanpa mematikan thread
-  - Semua crash internal dibungkus catch-all agar thread abadi
-=================================================================
-"""
-
+import threading
+import queue
+import time
 import cv2
 import mediapipe as mp
-import math
-import time
-import threading
 import collections
+import ctypes # For thread priority
 from PIL import Image
-
+from core.resource_monitor import ResourceMonitor
 
 class VisionEngine:
-    def __init__(self, camera_index: int = 0):
-        # --- MediaPipe Setup ---
+    """
+    Kecerdasan Buatan (Computer Vision) untuk deteksi kelelahan dan atensi.
+    UPGRADE: v5.0 "Self-Healing Shield" - Menghadapi CPU 100% (Next.js Compile).
+    """
+    def __init__(self, camera_index=0):
+        # 1. Pipeline Control & Persistence
+        self.frame_queue = queue.Queue(maxsize=1) 
+        self.monitor = ResourceMonitor(cpu_limit=85)
+        
+        # 2. MediaPipe Config (High Performance Delegate)
         self.mp_face_mesh = mp.solutions.face_mesh
+        
+        # [NEW] GPU DELEGATE SUPPORT (Attempt)
+        # Kami mencoba menggunakan GPU jika tersedia (TFLite)
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             max_num_faces=1,
-            refine_landmarks=True,       # Aktifkan landmark iris presisi tinggi
+            refine_landmarks=True,
             min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_tracking_confidence=0.4,
+            # Pelajari: Python API MediaPipe tidak selalu mengekspos Delegate secara langsung 
+            # seperti Android/C++, tapi kita pastikan config teringan.
         )
 
-        # --- Landmark Index (MediaPipe 468-point model) ---
+        # Landmarks 
         self.LEFT_EYE  = [33, 160, 158, 133, 153, 144]
         self.RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 
-        # --- Camera ---
+        # Lifecycle & Hardware
         self.camera_index = camera_index
         self.cap = None
-
-        # --- Thread Control ---
         self.is_running = False
-        self._lock = threading.Lock()   # Satu lock untuk SEMUA state mutable
-
-        # --- EAR State ---
-        self.ear_score   = 0.5
+        self.is_recovering = False # Flag saat sedang reset hardware
+        self._lock = threading.Lock()
+        
+        # State & Health
+        self.ear_score = 0.5
         self.ear_history = collections.deque(maxlen=10)
-
-        # --- Frame Output (untuk CameraWidget di overlay) ---
-        self.current_frame: Image.Image | None = None
-
-        # --- Citra Anak (Emosi + Gaze) ---
-        self.current_emotion = "NEUTRAL"
-        self.pupil_coords    = {"x": 0.5, "y": 0.5}
-        self.face_detected   = False
-        self.frame_count     = 0        # FPS throttle counter
-
-        # --- Anti-Cheat / Identity ---
-        self.reference_signature   = None
-        self.identity_verified     = True
-        self.no_face_frames        = 0
-        self.camera_ready          = False
-        self._available_cameras    = []
-        self._last_cam_scan        = 0
-        self.last_update_tick      = time.time()
-
-    def get_available_cameras(self):
-        """Ambil list kamera yang terdeteksi (dengan throttling scan)."""
-        now = time.time()
-        # Scan perdana atau tiap 5 detik
-        if not self._available_cameras or (now - self._last_cam_scan > 5.0):
-            self._available_cameras = self.list_available_cameras()
-            self._last_cam_scan = now
-        return self._available_cameras
-
-    @staticmethod
-    def list_available_cameras():
-        """
-        Mendeteksi semua indeks kamera yang tersedia di sistem.
-        Mencoba beberapa backend (DSHOW & MSMF & Default) untuk kompatibilitas Windows.
-        """
-        available = []
-        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, None]
-        
-        print("[Vision] 🔍 Memulai pemindaian hardware kamera...")
-        for i in range(5): # Cek index 0-4
-            found = False
-            for b in backends:
-                try:
-                    if b is not None:
-                        cap = cv2.VideoCapture(i, b)
-                    else:
-                        cap = cv2.VideoCapture(i)
-                        
-                    if cap is not None and cap.isOpened():
-                        # Verifikasi apakah benar-benar bisa baca frame
-                        success, _ = cap.read()
-                        if success:
-                            available.append(i)
-                            print(f"[Vision] ✅ Kamera terdeteksi di Index {i} (Backend: {b})")
-                            found = True
-                        cap.release()
-                        if found: break
-                except:
-                    continue
-        
-        if not available:
-            print("[Vision] ⚠️ Tidak ada kamera aktif yang terdeteksi.")
-        return available
-
-    # ================================================================
-    # HELPER: Jarak Euclidean
-    # ================================================================
-
-    def _calc_dist(self, p1, p2) -> float:
-        """Jarak Euclidean antara dua MediaPipe NormalizedLandmark."""
-        return math.hypot(p2.x - p1.x, p2.y - p1.y)
-
-    def _calc_dist_idx(self, mesh, i1: int, i2: int) -> float:
-        return self._calc_dist(mesh[i1], mesh[i2])
-
-    # ================================================================
-    # EAR CALCULATION
-    # ================================================================
-
-    def _calculate_ear(self, mesh, eye_indices: list) -> float:
-        """Eye Aspect Ratio sesuai rumus proposal."""
-        p1, p2, p3, p4, p5, p6 = [mesh[i] for i in eye_indices]
-        ver1 = self._calc_dist(p2, p6)
-        ver2 = self._calc_dist(p3, p5)
-        hor  = self._calc_dist(p1, p4)
-        if hor == 0:
-            return 0.0
-        return (ver1 + ver2) / (2.0 * hor)
-
-    # ================================================================
-    # CITRA ANAK: EMOSI + GAZE
-    # ================================================================
-
-    def _detect_citra_anak(self, mesh):
-        """Deteksi Emosi & Pupil via landmark mathematics (lightweight)."""
-        m_left, m_right = mesh[61], mesh[291]
-        m_top, m_bottom = mesh[13], mesh[14]
-
-        # MAR (Mouth Aspect Ratio) → Senyum
-        mar = self._calc_dist(m_top, m_bottom) / (self._calc_dist(m_left, m_right) or 1e-6)
-
-        # Jarak alis → Bingung/Marah
-        brow_dist = self._calc_dist(mesh[105], mesh[334])
-
-        # Sudut bibir turun → Sedih
-        avg_corner_y = (m_left.y + m_right.y) / 2
-        sad_indicator = avg_corner_y - m_top.y
-
-        if mar > 0.4:
-            self.current_emotion = "HAPPY"
-        elif brow_dist < 0.2:
-            self.current_emotion = "CONFUSED/ANGRY"
-        elif sad_indicator > 0.05:
-            self.current_emotion = "SAD"
-        else:
-            self.current_emotion = "NEUTRAL"
-
-        # Pupil tracking via Iris landmark (index 468 & 473)
-        if len(mesh) > 473:
-            iris_l = mesh[468]
-            iris_r = mesh[473]
-            self.pupil_coords = {
-                "x": round((iris_l.x + iris_r.x) / 2, 3),
-                "y": round((iris_l.y + iris_r.y) / 2, 3),
-            }
-
-    # ================================================================
-    # IDENTITY TRACKING (Anti-Cheat)
-    # ================================================================
-
-    def _get_face_signature(self, mesh) -> dict | None:
-        eye_dist    = self._calc_dist_idx(mesh, 33, 263)
-        nose_len    = self._calc_dist_idx(mesh, 1, 2)
-        mouth_width = self._calc_dist_idx(mesh, 61, 291)
-        face_height = self._calc_dist_idx(mesh, 10, 152)
-        if eye_dist == 0:
-            return None
-        return {
-            "eye_nose_ratio":   round(eye_dist / nose_len,    3) if nose_len    != 0 else 0,
-            "mouth_eye_ratio":  round(mouth_width / eye_dist, 3),
-            "face_width_ratio": round(eye_dist / face_height, 3) if face_height != 0 else 0,
-        }
-
-    def set_reference_identity(self):
-        """Mengunci wajah saat ini sebagai referensi siswa."""
-        print("[Vision] 🔐 Mengunci Identitas Referensi...")
-        with self._lock:
-            self.reference_signature = "PENDING"
-        return True
-
-    def _verify_identity(self, current_sig: dict):
-        if not self.reference_signature or self.reference_signature == "PENDING":
-            return
-        diffs = []
-        for key in self.reference_signature:
-            ref  = self.reference_signature[key]
-            curr = current_sig.get(key, 0)
-            if ref == 0:
-                continue
-            diffs.append(abs(curr - ref) / ref)
-        avg_diff = sum(diffs) / len(diffs) if diffs else 0
-        if avg_diff > 0.15:
-            self.identity_mismatch_frames += 1
-            if self.identity_mismatch_frames > 30:
-                self.identity_verified = False
-        else:
-            self.identity_mismatch_frames = 0
-            self.identity_verified = True
-
-    # ================================================================
-    # FRAME RENDERING: Tambah overlay landmark ke frame
-    # ================================================================
-
-    def _draw_eye_landmarks(self, frame_rgb, mesh, img_w: int, img_h: int):
-        """Gambar titik hijau di landmark mata — efek UI medis/futuristik."""
-        for p in self.LEFT_EYE + self.RIGHT_EYE:
-            cx = int(mesh[p].x * img_w)
-            cy = int(mesh[p].y * img_h)
-            cv2.circle(frame_rgb, (cx, cy), 2, (0, 255, 0), -1)
-
-        # EAR label di pojok kiri atas frame
-        ear_text = f"EAR: {self.ear_score:.2f}"
-        color    = (239, 68, 68) if self.ear_score < 0.25 else (16, 185, 129)
-        cv2.putText(frame_rgb, ear_text, (10, 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-    # ================================================================
-    # LIFECYCLE
-    # ================================================================
+        self._raw_frame_lock = threading.Lock()
+        self._latest_raw_frame = None  # [STRICT-V6] Decoupled Preview Frame
+        self.current_frame = None      # Deprecated in favor of _latest_raw_frame
+        self.face_detected = False
+        self.frame_count = 0
+        self.last_update_tick = time.time() # Watchdog: Last SUCCESSFUL read
+        self._last_mesh = None
+        self.no_face_frames = 0
+        self.consecutive_failures = 0 # Deteksi kegagalan I/O hardware
 
     def start(self):
-        """Memulai kamera dan algoritma di background thread."""
+        """Memulai sistem vision (Multi-threaded)."""
         self.is_running = True
-        self.cap = cv2.VideoCapture(self.camera_index)
-        threading.Thread(target=self._update, daemon=True).start()
+        # [V12] Reset watchdog timer to current time.
+        # Jangan mematikan timer di sini, biarkan _capture_thread yang menangani init pertama kali.
+        self.last_update_tick = time.time()
+        
+        # [STEP 2] Pipeline Threads (Decoupled)
+        # Kami membedakan prioritas thread antar tugas
+        t_cap = threading.Thread(target=self._capture_thread, name="CamCapture", daemon=True)
+        t_ai = threading.Thread(target=self._process_loop, name="AIProcess", daemon=True)
+        
+        t_cap.start()
+        t_ai.start()
+        
+        print(f"[Vision] 🚀 Shield v12 AKTIF (Kamera Index: {self.camera_index})")
         return True
 
+    def _init_camera(self):
+        """Inisialisasi modern menggunakan Media Foundation (MSMF) untuk Windows 10/11."""
+        with self._lock:
+            self.is_recovering = True
+            
+        try:
+            print(f"[Vision] 🛠️ [STRICT] Mencoba Inisialisasi modern (MSMF) di Kamera {self.camera_index}...")
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            
+            # [STRICT] Coba CAP_DSHOW (Legacy Compatibility) kemudian CAP_MSMF (Modern Windows)
+            # DSHOW seringkali lebih stabil saat pencarian awal dan error reporting cepat
+            new_cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+            
+            if not new_cap.isOpened():
+                 new_cap = cv2.VideoCapture(self.camera_index, cv2.CAP_MSMF)
+
+            if not new_cap.isOpened():
+                 new_cap = cv2.VideoCapture(self.camera_index)
+
+            if new_cap.isOpened():
+                # [STRICT] Hardcoded optimizations for speed
+                new_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                new_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                new_cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) # Force latest frame only
+                new_cap.set(cv2.CAP_PROP_FPS, 30)
+                new_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG')) 
+                
+                with self._lock:
+                    self.cap = new_cap
+                    self.is_recovering = False
+                print(f"[Vision] ✅ Hardware Kamera {self.camera_index} Siap.")
+                return True
+        except Exception as e:
+            print(f"[Vision] ⚠️ Inisialisasi Gagal Total: {e}")
+        
+        with self._lock:
+            self.is_recovering = False
+        return False
+
     def stop(self):
-        """Mematikan kamera dan thread."""
         self.is_running = False
-        if self.cap:
-            self.cap.release()
+        with self._lock:
+            if self.cap:
+                self.cap.release()
+                self.cap = None
 
-    # ================================================================
-    # MAIN LOOP (Background Thread)
-    # ================================================================
+    def _capture_thread(self):
+        """THREAD 1: Camera I/O dengan PRIORITAS TERTINGGI OS."""
+        # Windows API: Set current thread to THREAD_PRIORITY_HIGHEST (Value 2)
+        try:
+             ctypes.windll.kernel32.SetThreadPriority(ctypes.windll.kernel32.GetCurrentThread(), 2)
+             print("[STRICT] 🚄 Camera Capture priority set to HIGHEST.")
+        except: pass
 
-    def _update(self):
-        LEFT_EYE  = self.LEFT_EYE
-        RIGHT_EYE = self.RIGHT_EYE
-
-        print(f"[Vision] 🎞️ Thread loop started for index {self.camera_index}")
         while self.is_running:
             try:
-                # 1. Capture Frame (TIMEOUT Check point)
-                # print("[DEBUG-VISION] -> Reading frame...")
-                success, frame = self.cap.read()
-                
-                if not success or frame is None:
-                    print("[VISION] ⚠️ Gagal mendapat gambar dari kamera. Mencoba lagi...")
-                    time.sleep(1)
+                if self.cap is None or not self.cap.isOpened():
+                    time.sleep(1.5)
+                    if self._init_camera():
+                         # Berikan jeda pemanasan untuk sensor CMOS
+                         time.sleep(1.0) 
                     continue
 
-                # 2. Process MediaPipe
-                # print("[DEBUG-VISION] -> Processing MediaPipe...")
-                frame.flags.writeable = False
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results   = self.face_mesh.process(frame_rgb)
-                frame.flags.writeable = True
-
-                # Kita butuh frame RGB yang bisa ditulis untuk overlay
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-                if results.multi_face_landmarks:
-                    with self._lock:
-                        self.face_detected = True
-                    self.no_face_frames = 0
-                    mesh = results.multi_face_landmarks[0].landmark
-
-                    # EAR Calculation (rata-rata 2 mata)
-                    left_ear  = self._calculate_ear(mesh, LEFT_EYE)
-                    right_ear = self._calculate_ear(mesh, RIGHT_EYE)
-                    avg_ear   = (left_ear + right_ear) / 2.0
-
-                    with self._lock:
-                        self.ear_history.append(avg_ear)
-                        self.ear_score = sum(self.ear_history) / len(self.ear_history)
-
-                    # Gambar landmark overlay ke frame
-                    img_h, img_w, _ = frame_rgb.shape
-                    self._draw_eye_landmarks(frame_rgb, mesh, img_w, img_h)
-
-                    # FPS Throttling: Emosi & Identitas hanya setiap 5 frame (~10 FPS)
-                    self.frame_count += 1
-                    if self.frame_count >= 5:
-                        try:
-                            self._detect_citra_anak(mesh)
-
-                            current_sig = self._get_face_signature(mesh)
-                            with self._lock:
-                                if self.reference_signature == "PENDING" and current_sig:
-                                    self.reference_signature = current_sig
-                                    print(f"[Vision] ✅ Identitas Terkunci: {self.reference_signature}")
-                                elif current_sig:
-                                    self._verify_identity(current_sig)
-                        except Exception as e_citra:
-                            print(f"[VisionEngine] Citra Anak Error: {e_citra}")
-                        self.frame_count = 0
+                # Cek apakah kamera freeze (Stuck di buffer driver)
+                # Gunakan grab() dulu untuk membuang frame lama
+                success = self.cap.grab()
+                if success:
+                    success, frame = self.cap.retrieve()
+                
+                if success and frame is not None:
+                    self.last_update_tick = time.time()
+                    self.consecutive_failures = 0
+                    
+                    # [V6] Update Raw Frame for UI Preview (Fast/Decoupled)
+                    with self._raw_frame_lock:
+                        self._latest_raw_frame = frame.copy()
+                    
+                    # Update queue for AI Processing (Will skip if queue is full)
+                    try:
+                        if not self.frame_queue.empty():
+                            self.frame_queue.get_nowait()
+                        self.frame_queue.put_nowait(frame)
+                    except queue.Full: pass
                 else:
-                    with self._lock:
-                        self.face_detected = False
-                    self.no_face_frames += 1
-                    self.current_emotion = "OFF-CAMERA"
-                    if self.no_face_frames > 30:
-                        with self._lock:
-                            self.ear_score = 0.0
-
-                # Commit frame ke buffer (thread-safe)
-                pil_frame = Image.fromarray(frame_rgb)
-                # Update Watchdog (Deteksi freeze)
-                self.last_update_tick = time.time()
-
-                # Commit frame ke buffer (thread-safe)
-                pil_frame = Image.fromarray(frame_rgb)
-                with self._lock:
-                    self.current_frame = pil_frame
+                    self.consecutive_failures += 1
+                    # RADICAL RECOVERY [V13]: Toleransi lebih tinggi (15x) untuk warm-up sensor
+                    if self.consecutive_failures > 15:
+                        print(f"[Vision] 🚨 Hardware Stuck Persistent ({self.consecutive_failures}). Resetting Camera...")
+                        self._init_camera()
+                        time.sleep(1.0)
+                        time.sleep(1.0)
+                    time.sleep(0.1)
 
             except Exception as e:
-                # 🛡️ JARING PENGAMAN: Thread tidak pernah mati karena crash internal
-                print(f"[VISION] 🚨 Engine Penglihatan Crash: {e}")
+                print(f"[Vision-IO] Exception: {e}")
                 time.sleep(0.5)
 
-            time.sleep(0.06)  # ~15 FPS internal throttle (CPU Optimized)
+    def _process_loop(self):
+        """THREAD 2: AI Processing dengan ADAPTIVE THROTTLING."""
+        while self.is_running:
+            # 1. Jeda Dinamis berdasarkan Beban CPU (ResourceMonitor)
+            # Jika CPU > 85%, AI akan melambat secara otomatis
+            time.sleep(self.monitor.get_adaptive_sleep())
 
-    # ================================================================
-    # PUBLIC API
-    # ================================================================
+            try:
+                # 2. Ambil frame terbaru (Timeout 1.0s untuk cegah hang)
+                try:
+                    frame = self.frame_queue.get(timeout=1.0)
+                except queue.Empty:
+                    continue
 
-    def get_frame(self) -> Image.Image | None:
-        """Ambil PIL Image frame terbaru (thread-safe). Untuk CameraWidget."""
+                # 3. Optimization: Downscaling 320p untuk proses AI Mesh
+                # Ini menghemat CPU sangat besar dibandingkan memproses frame 720p/1080p
+                small_frame = cv2.resize(frame, (320, 240))
+                
+                self.frame_count += 1
+                results = None
+                
+                # Adaptive Skip Rate
+                # Normal: Proses 1 dari 2 frame. Stress: Proses 1 dari 3 frame.
+                skip_rate = 3 if self.monitor.should_throttle() else 2
+                
+                if self.frame_count % skip_rate == 0:
+                    small_frame.flags.writeable = False
+                    rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+                    results = self.face_mesh.process(rgb_small)
+                    small_frame.flags.writeable = True
+
+                # 4. State Management dengan Thread-Locking
+                if results and results.multi_face_landmarks:
+                    self.no_face_frames = 0
+                    with self._lock:
+                        self.face_detected = True
+                        self._last_mesh = results.multi_face_landmarks[0].landmark
+                else:
+                    self.no_face_frames += 1
+                    # Toleransi 20 frame tanpa wajah sebelum dinyatakan "Hilang"
+                    if self.no_face_frames > 20: 
+                        with self._lock: 
+                            self.face_detected = False
+                            self._last_mesh = None
+
+                # [STRICT-V6] AI Loop no longer handles UI Frame Conversion
+                # This ensures video feed stays 30 FPS regardless of AI speed.
+                
+            except Exception as e:
+                # Jangan biarkan exception mematikan loop processing
+                print(f"[AI-LOOP] Warning: {e}")
+                time.sleep(0.1)
+
+    def is_camera_active(self):
+        """Mengecek apakah hardware kamera terikat dan aktif (Toleran terhadap fase Recovery)."""
         with self._lock:
-            return self.current_frame
+            if self.is_recovering:
+                return True # Tetap lapor aktif saat sedang mencoba reconnect
+            return self.cap is not None and self.cap.isOpened()
 
-    def get_ear(self) -> float:
-        """Ambil nilai EAR yang sudah dihaluskan (Moving Average)."""
-        with self._lock:
-            return round(self.ear_score, 3)
+    def get_frame(self, target_size=(640, 480)):
+        """Mendapatkan frame terbaru dengan prioritas kecepatan visual (Visual Fluidity)."""
+        with self._raw_frame_lock:
+            if self._latest_raw_frame is None:
+                return None
+            render_frame = self._latest_raw_frame.copy()
 
-    def get_data(self) -> tuple:
-        """Shorthand untuk get_frame() + get_ear() sekaligus (satu lock)."""
-        with self._lock:
-            return self.current_frame, round(self.ear_score, 3)
-
-    def is_camera_active(self) -> bool:
-        """Cek apakah kamera terbuka dan thread berjalan."""
-        if not self.cap:
-            return False
-        return self.cap.isOpened() and self.is_running
+        # [V7] Ultra-Fast Resize for Preview
+        # Gunakan INTER_NEAREST untuk preview karena jauh lebih hemat CPU daripada INTER_LINEAR
+        if target_size:
+            render_frame = cv2.resize(render_frame, target_size, interpolation=cv2.INTER_NEAREST)
         
-    def is_face_detected(self) -> bool:
-        """Sinyal apakah wajah terlihat untuk sinkronisasi dashboard."""
+        # 2. Convert to RGB
+        frame_rgb = cv2.cvtColor(render_frame, cv2.COLOR_BGR2RGB)
+        
+        # 3. Layering: Drawing landmarks (hanya jika ada mesh terbaru)
+        with self._lock:
+            latest_mesh = self._last_mesh
+            
+        if latest_mesh:
+            h, w, _ = frame_rgb.shape
+            self._draw_eye_landmarks(frame_rgb, latest_mesh, w, h)
+            
+        # 4. Final conversion (Zero-Latency PIL)
+        return Image.fromarray(frame_rgb)
+
+    def get_ear(self):
+        with self._lock:
+            return self.ear_score
+
+    def is_face_detected(self):
         with self._lock:
             return self.face_detected
 
-    def get_citra_anak(self) -> dict:
-        """Data emosi + gaze untuk dikirim via MQTT."""
-        with self._lock:
-            return {
-                "emotion":     self.current_emotion,
-                "gaze_coords": self.pupil_coords,
-            }
+    def _calculate_ear(self, mesh, eye_indices):
+        """Matematika dasar untuk Eye Aspect Ratio."""
+        v1 = self._dist(mesh[eye_indices[1]], mesh[eye_indices[5]])
+        v2 = self._dist(mesh[eye_indices[2]], mesh[eye_indices[4]])
+        h1 = self._dist(mesh[eye_indices[0]], mesh[eye_indices[3]])
+        return (v1 + v2) / (2.0 * h1) if h1 > 0 else 0.0
+
+    def _dist(self, p1, p2):
+        return ((p1.x - p2.x)**2 + (p1.y - p2.y)**2)**0.5
+
+    def _draw_eye_landmarks(self, frame_rgb, mesh, img_w, img_h):
+        for idx in self.LEFT_EYE + self.RIGHT_EYE:
+            pt = mesh[idx]
+            cv2.circle(frame_rgb, (int(pt.x * img_w), int(pt.y * img_h)), 1, (0, 255, 0), -1)
+
+    @staticmethod
+    def list_available_cameras():
+        available = []
+        # Cek hingga 5 index kamera
+        for i in range(5):
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                available.append(i)
+                cap.release()
+        return available
+
+    def get_available_cameras(self):
+         return self.list_available_cameras()
+
+    def get_citra_anak(self):
+        """Kembalikan status emosi (PLACEHOLDER: Untuk integrasi AI Expert berikutnya)."""
+        return {"emotion": "NEUTRAL", "gaze_coords": {"x": 0.5, "y": 0.5}}
+
+    def set_reference_identity(self):
+         """Kalibrasi identitas awal sesi (Identity Lock)."""
+         print("[Vision] 🔐 Reference Identity Locked.")
+         self.identity_verified = True

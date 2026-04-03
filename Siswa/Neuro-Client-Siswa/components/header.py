@@ -36,4 +36,7 @@ class HeaderFrame(ctk.CTkFrame):
         self.status_text.pack(side="left", padx=(0, 12), pady=6)
 
     def set_title(self, new_title):
-        self.title_label.configure(text=new_title)
+        if self.title_label and self.title_label.winfo_exists():
+            try:
+                self.title_label.configure(text=new_title)
+            except: pass

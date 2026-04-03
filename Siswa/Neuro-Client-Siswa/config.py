@@ -7,4 +7,5 @@ SIMULATION_MODE = True
 MQTT_BROKER = "broker.emqx.io"
 MQTT_PORT = 1883 
 MQTT_WS_PORT = 8084
-DEVICE_ID = "PANDAI_NC_01" 
+import uuid
+DEVICE_ID = f"PANDAI_NC_01_{uuid.uuid4().hex[:6]}" # Unique ID per instance to avoid collisions
