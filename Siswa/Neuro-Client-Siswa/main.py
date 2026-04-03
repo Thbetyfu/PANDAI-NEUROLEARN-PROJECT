@@ -115,26 +115,13 @@ class NeuroClientApp(ctk.CTk):
         self.bind("<Map>", self.on_window_restore)
         self.bind("<Unmap>", self.on_window_minimize)
 
-        # 7. ASYNC CORE STARTUP (UCD: Modern Splash)
-        try:
-            self.init_core_systems()
-            # [V11] Professional Splash Transition:
-            # Berikan sinyal bahwa sistem sedang menyiapkan keamanan
-            self.header.set_title("Inisialisasi...")
-            
-            import threading
-            threading.Thread(target=self._async_boot_guard, daemon=True).start()
-        except Exception as e: 
-             self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}", error_code="SYS_ERR")
-             return
+        # 7. DEFERRED CORE STARTUP (UCD: Solusi Anti White-Screen)
+        # Kami membiarkan jendela UI digambar terlebih dahulu agar siswa tidak panik melihat layar putih.
+        self.header.set_title("Menyiapkan PANDAI Engine...")
+        self.after(200, self._start_background_init)
 
         # 8. RUNTIME HEALTH MONITOR
         self.check_runtime_health()
-
-        # Final Status
-        print("="*60)
-        print("  Core Systems: INITIALIZED & ONLINE & MONITORING")
-        print("="*60)
 
     def check_runtime_health(self):
         """Monitor berkala untuk menangkap error dari engine (Background Thread)."""
@@ -147,23 +134,43 @@ class NeuroClientApp(ctk.CTk):
         # Terus monitor tiap 2 detik
         self.after(2000, self.check_runtime_health)
 
-    def _async_boot_guard(self):
-        """[V10] Thread worker untuk integrity check."""
+    def _start_background_init(self):
+        """Memindahkan proses I/O berat (MQTT/Kamera) ke background thread agar UI tetap mulus."""
+        print("[BOOT] 🚄 Starting Background Bootstrap Worker...")
+        threading.Thread(target=self._background_init_worker, daemon=True).start()
+
+    def _background_init_worker(self):
+        """Pekerja yang merakit komponen mesin di belakang layar (Threaded)."""
         try:
+            # 1. Inisialisasi Hardware & Engine
+            self.init_core_systems()
+            
+            # 2. Jalankan Integrity Guard (E01-E03)
+            print("[GUARD] 🛡️ Menjalankan Pemeriksaan Integritas Sistem...")
             self.run_integrity_check()
-            # Jika berhasil, pindahkan kembali ke UI thread
+            
+            # 3. Jika berhasil, pindahkan kembali ke UI thread untuk membuka Dashboard
             self.after(0, self._on_boot_success)
+            
         except PandaiCriticalError as e:
             self.after(0, lambda: self.show_panic_screen(f"Alasan: {e.message} (Kode: {e.code})", error_code=e.code))
         except Exception as e:
-            self.after(0, lambda: self.show_panic_screen(f"Fatal Startup Error: {e}", error_code="BOOT_FAIL"))
+            print(f"[FATAL] Startup Error: {e}")
+            self.after(0, lambda: self.show_panic_screen(f"Terjadi kesalahan sistem saat inisialisasi: {e}", error_code="SYS_ERR"))
 
     def _on_boot_success(self):
         self.security_token = True
         print("[Security] 🛡️ Integrity Check Passed. Moving to Dashboard.")
         
+        # [NEW-V15] INJEKSI ENGINE KE UI SECARA AMAN (Wajib di Main Thread)
+        if hasattr(self, 'engine') and self.engine:
+            if "Statistik Anda" in self.pages:
+                self.pages["Statistik Anda"].engine = self.engine
+                self.pages["Statistik Anda"].update_realtime()
+            if "Beranda" in self.pages:
+                self.pages["Beranda"].engine = self.engine
+
         # [V11] FORCE UI REFRESH
-        # Pastikan Aura (Pelangi) dibuat meskipun windows tidak menembakkan resize event
         self.update_idletasks()
         self.generate_and_place_aura()
         
@@ -337,13 +344,9 @@ class NeuroClientApp(ctk.CTk):
         )
         self.engine.start()
 
-        # Inject engine and start update loop
-        if "Statistik Anda" in self.pages:
-            self.pages["Statistik Anda"].engine = self.engine
-            self.pages["Statistik Anda"].update_realtime()
-        
-        if "Beranda" in self.pages:
-            self.pages["Beranda"].engine = self.engine
+        # [V15] Hapus injeksi UI dari sini. 
+        # Injeksi dipindah ke _on_boot_success untuk menghindari Threading Error CustomTkinter.
+        pass
 
     def on_closing(self):
         print("Tutup app, mematikan semua sistem...")
