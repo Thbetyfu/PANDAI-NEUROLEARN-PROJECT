@@ -15,7 +15,10 @@ export function useNeuroListener() {
             const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
                 clientId: `LMS_WEB_${Math.random().toString(16).slice(3)}`,
                 clean: true,
-                reconnectPeriod: 5000,
+                reconnectPeriod: 4000,
+                keepalive: 60, // Standard MQTT keepalive
+                connectTimeout: 30 * 1000, // 30 seconds wait for handshake
+                resubscribe: true, // Auto-resubscribe after reconnection
             });
 
             const DEVICE_ID = "PANDAI_NC_01";

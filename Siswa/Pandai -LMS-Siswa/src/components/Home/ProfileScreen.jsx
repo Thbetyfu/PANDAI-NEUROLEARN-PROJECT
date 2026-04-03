@@ -37,39 +37,45 @@ export default function ProfileScreen() {
       <div className='text-left w-full space-y-6'>
 
         {/* BAGIAN UTAMA: Neuro-Cognitive Status */}
-        <div className='bg-white border border-gray-100 rounded-3xl p-5 shadow-sm'>
-          <div className='flex justify-between items-center mb-4'>
-            <h3 className='font-bold text-[#1D115A] text-lg'>Status Saraf (Real-time)</h3>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${status === 'ONLINE' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-              {status}
-            </span>
+        <div className='bg-white/50 backdrop-blur-xl border border-white/40 rounded-[40px] p-8 shadow-2xl shadow-blue-900/5 relative overflow-hidden'>
+          {/* Decorative Glow */}
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+          
+          <div className='flex justify-between items-center mb-8 relative z-10'>
+            <h3 className='font-black text-[#1D115A] text-xl tracking-tight'>Status Saraf (Real-time)</h3>
+            <div className="flex items-center gap-2 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{status}</span>
+            </div>
           </div>
 
-          <div className='grid grid-cols-2 gap-3 mb-4'>
-            <div className='bg-linear-to-br from-[#F8FAFF] to-[#E2EBFF] p-4 rounded-2xl border border-white/50 shadow-sm'>
-              <Brain size={20} className='text-blue-600 mb-2' />
-              <p className='text-[10px] text-gray-500 font-medium uppercase tracking-wider'>Focus Index</p>
-              <p className='text-2xl font-black text-blue-700'>
+          <div className='grid grid-cols-2 gap-4 mb-8 relative z-10'>
+            <div className='bg-linear-to-br from-blue-600 to-blue-800 p-6 rounded-[32px] shadow-lg shadow-blue-600/20 text-white'>
+              <Brain size={24} className='text-blue-100 mb-3' />
+              <p className='text-[10px] text-blue-100/70 font-bold uppercase tracking-[0.1em]'>Focus Index</p>
+              <p className='text-3xl font-black italic'>
                 {((neuroData?.payload?.metrics?.attention_index || 0) * 100).toFixed(0)}%
               </p>
             </div>
-            <div className='bg-linear-to-br from-[#FDF8FF] to-[#F3E8FF] p-4 rounded-2xl border border-white/50 shadow-sm'>
-              <Activity size={20} className='text-purple-600 mb-2' />
-              <p className='text-[10px] text-gray-500 font-medium uppercase tracking-wider'>Beban Kerja</p>
-              <p className='text-2xl font-black text-purple-700'>
+            <div className='bg-white border border-gray-100 p-6 rounded-[32px] shadow-sm'>
+              <Activity size={24} className='text-purple-600 mb-3' />
+              <p className='text-[10px] text-gray-400 font-bold uppercase tracking-[0.1em]'>Beban Kerja</p>
+              <p className='text-3xl font-black text-purple-700 italic'>
                 {neuroData?.payload?.metrics?.cognitive_load || 0}%
               </p>
             </div>
           </div>
 
           {/* Real-time Charts Section */}
-          <div className='mt-8 pt-8 border-t border-gray-100'>
-            <div className='flex items-center gap-2 mb-4'>
-              <TrendingUp size={20} className='text-blue-600' />
-              <h3 className='font-bold text-[#1D115A] text-lg'>Live Neuro-Activity</h3>
+          <div className='mt-10 pt-10 border-t border-gray-100/50 relative z-10'>
+            <div className='flex items-center gap-2 mb-6'>
+              <div className="p-2 bg-blue-50 rounded-xl">
+                <TrendingUp size={20} className='text-blue-600' />
+              </div>
+              <h3 className='font-black text-[#1D115A] text-lg uppercase tracking-tighter'>Live Neuro-Activity</h3>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               <BiometricChart
                 label="Focus Stability (Attention)"
                 value={(neuroData?.payload?.metrics?.attention_index || 0)}
@@ -78,78 +84,88 @@ export default function ProfileScreen() {
               <BiometricChart
                 label="Cognitive Fatigue (EAR)"
                 value={neuroData?.payload?.metrics?.ear_score || 0}
-                color="#8B5CF6"
+                color="#7C3AED"
                 min={0}
                 max={0.5}
               />
             </div>
           </div>
 
-          {/* NEW: Historical Trend Section */}
-          <div className='mt-8 pt-8 border-t border-gray-100'>
-            <div className='flex items-center justify-between mb-4'>
+          {/* Historical Trend Section */}
+          <div className='mt-10 pt-10 border-t border-gray-100/50 relative z-10'>
+            <div className='flex items-center justify-between mb-6'>
               <div className='flex items-center gap-2'>
-                <Calendar size={20} className='text-indigo-600' />
-                <h3 className='font-bold text-[#1D115A] text-lg'>Tren Belajar 7 Hari</h3>
+                <div className="p-2 bg-indigo-50 rounded-xl">
+                    <Calendar size={20} className='text-indigo-600' />
+                </div>
+                <h3 className='font-black text-[#1D115A] text-lg uppercase tracking-tighter'>Tren Belajar 7 Hari</h3>
               </div>
             </div>
             
             {isLoading ? (
-              <div className="w-full h-48 bg-gray-50/50 animate-pulse rounded-3xl flex items-center justify-center border border-dashed border-gray-200">
+              <div className="w-full h-48 bg-gray-50/50 animate-pulse rounded-[32px] flex items-center justify-center border border-dashed border-gray-200">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Menarik Log Sejarah...</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Menarik Log Sejarah...</p>
                 </div>
               </div>
             ) : error ? (
-              <div className="w-full h-48 bg-red-50 rounded-3xl flex items-center justify-center border border-red-200">
+              <div className="w-full h-48 bg-red-50 rounded-[32px] flex items-center justify-center border border-red-200">
                  <p className="text-red-500 text-xs font-bold">{error}</p>
               </div>
             ) : (
               <HistoricalTrendChart data={historyData} />
             )}
 
-            <div className='mt-3 flex justify-center gap-4'>
-              <div className='flex items-center gap-1.5'>
-                <div className='w-2 h-2 rounded-full bg-blue-600'></div>
-                <span className='text-[10px] font-bold text-gray-400'>RATA-RATA FOKUS</span>
+            <div className='mt-6 flex justify-center gap-6'>
+              <div className='flex items-center gap-2'>
+                <div className='w-2.5 h-2.5 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)]'></div>
+                <span className='text-[10px] font-black text-gray-400 uppercase tracking-widest'>RATA-RATA FOKUS</span>
               </div>
-              <div className='flex items-center gap-1.5'>
-                <div className='w-2 h-2 rounded-full bg-purple-600'></div>
-                <span className='text-[10px] font-bold text-gray-400'>BEBAN KERJA</span>
+              <div className='flex items-center gap-2'>
+                <div className='w-2.5 h-2.5 rounded-full bg-purple-600 shadow-[0_0_8px_rgba(124,58,237,0.5)]'></div>
+                <span className='text-[10px] font-black text-gray-400 uppercase tracking-widest'>BEBAN KERJA</span>
               </div>
             </div>
           </div>
 
           {/* Visual Monitoring (Kamera) */}
-          <div className='mt-8 pt-8 border-t border-gray-100'>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className='font-bold text-[#1D115A] text-lg flex items-center gap-2'>
-                <Camera size={20} className="text-blue-500" />
+          <div className='mt-10 pt-10 border-t border-gray-100/50 relative z-10'>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className='font-black text-[#1D115A] text-lg flex items-center gap-2 uppercase tracking-tighter'>
+                <div className="p-2 bg-blue-50 rounded-xl">
+                    <Camera size={20} className="text-blue-500" />
+                </div>
                 Monitoring Visual
               </h3>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${neuroData?.payload?.metrics?.face_detected ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+              <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                neuroData?.payload?.metrics?.face_detected 
+                  ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' 
+                  : 'bg-red-500/10 text-red-600 border-red-500/20'
+              }`}>
                 {neuroData?.payload?.metrics?.face_detected ? 'FACE DETECTED' : 'FACE NOT FOUND'}
-              </span>
+              </div>
             </div>
 
-            <div className='bg-white border border-gray-100 p-4 rounded-2xl relative overflow-hidden shadow-xs'>
+            <div className='bg-linear-to-br from-white to-gray-50 border border-gray-200 p-6 rounded-[32px] relative overflow-hidden shadow-sm'>
               <div className="relative z-10">
-                <div className="flex justify-between items-end mb-2">
+                <div className="flex justify-between items-end mb-4">
                   <div>
-                    <p className='text-[10px] text-gray-500 font-medium'>Raut Wajah (EAR Score)</p>
-                    <p className='text-2xl font-black text-[#1D115A]'>{neuroData?.payload?.metrics?.ear_score || 0.00}</p>
+                    <p className='text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1'>Raut Wajah (EAR Score)</p>
+                    <p className='text-3xl font-black text-[#1D115A] tracking-tighter'>{neuroData?.payload?.metrics?.ear_score || 0.00}</p>
                   </div>
                   <div className="text-right">
-                    <p className='text-[10px] text-gray-500 font-medium text-right'>Analisis Citra</p>
-                    <p className={`text-[12px] font-bold ${neuroData?.payload?.metrics?.face_detected ? 'text-green-600' : 'text-gray-400'}`}>
+                    <p className='text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1'>Analisis Citra</p>
+                    <p className={`text-xs font-black uppercase tracking-tighter ${neuroData?.payload?.metrics?.face_detected ? 'text-green-600' : 'text-gray-300'}`}>
                       {neuroData?.payload?.metrics?.face_detected ? 'Kualitas Prima' : 'Sensor Standby'}
                     </p>
                   </div>
                 </div>
-                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden p-0.5">
                   <div
-                    className={`h-full transition-all duration-300 ${neuroData?.payload?.metrics?.ear_score < 0.24 ? 'bg-orange-500' : 'bg-blue-500'}`}
+                    className={`h-full rounded-full transition-all duration-700 ease-out shadow-sm ${
+                      neuroData?.payload?.metrics?.ear_score < 0.24 ? 'bg-orange-500' : 'bg-blue-600'
+                    }`}
                     style={{ width: `${Math.min(100, (neuroData?.payload?.metrics?.ear_score || 0) * 200)}%` }}
                   ></div>
                 </div>
@@ -158,30 +174,32 @@ export default function ProfileScreen() {
           </div>
 
           {/* Mood & Gaze Analysis */}
-          <div className='mt-8 pt-8 border-t border-gray-100'>
-            <div className='flex items-center gap-2 mb-4'>
-              <UserCheck size={20} className='text-purple-600' />
-              <h3 className='font-bold text-[#1D115A] text-lg'>Analisis Perilaku</h3>
+          <div className='mt-10 pt-10 border-t border-gray-100/50 relative z-10'>
+            <div className='flex items-center gap-2 mb-6'>
+              <div className="p-2 bg-purple-50 rounded-xl">
+                <UserCheck size={20} className='text-purple-600' />
+              </div>
+              <h3 className='font-black text-[#1D115A] text-lg uppercase tracking-tighter'>Analisis Perilaku</h3>
             </div>
 
-            <div className='grid grid-cols-2 gap-3 mb-6'>
-              <div className='bg-[#FDF8FF] border border-purple-50 p-4 rounded-3xl relative overflow-hidden'>
-                <Smile size={32} className="absolute -right-1 -top-1 text-purple-100/50" />
-                <p className='text-[10px] text-gray-500 font-bold uppercase mb-1'>Mood Analysis</p>
-                <p className='text-xl font-black text-purple-800'>{neuroData?.payload?.metrics?.emotion || "NEUTRAL"}</p>
-                <div className='mt-2 flex items-center gap-1'>
-                  <div className='w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse'></div>
-                  <span className='text-[8px] font-bold text-purple-400 uppercase tracking-tighter'>Emotion Sync Active</span>
+            <div className='grid grid-cols-2 gap-4 mb-8'>
+              <div className='bg-white border border-gray-100 p-6 rounded-[32px] relative overflow-hidden group hover:shadow-xl transition-all duration-500'>
+                <Smile size={64} className="absolute -right-4 -top-4 text-purple-100/30 group-hover:scale-125 transition-transform" />
+                <p className='text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2'>Mood Analysis</p>
+                <p className='text-2xl font-black text-purple-800 tracking-tighter'>{neuroData?.payload?.metrics?.emotion || "NEUTRAL"}</p>
+                <div className='mt-3 flex items-center gap-2'>
+                  <div className='w-2 h-2 rounded-full bg-purple-400 animate-ping'></div>
+                  <span className='text-[9px] font-black text-purple-400 uppercase tracking-widest'>Emotion Sync Active</span>
                 </div>
               </div>
 
-              <div className='bg-[#F8FAFF] border border-blue-50 p-4 rounded-3xl relative overflow-hidden'>
-                <MapPin size={32} className="absolute -right-1 -top-1 text-blue-100/50" />
-                <p className='text-[10px] text-gray-500 font-bold uppercase mb-1'>Attention Focus</p>
-                <p className='text-xl font-black text-blue-800 uppercase'>
+              <div className='bg-white border border-gray-100 p-6 rounded-[32px] relative overflow-hidden group hover:shadow-xl transition-all duration-500'>
+                <MapPin size={64} className="absolute -right-4 -top-4 text-blue-100/30 group-hover:scale-125 transition-transform" />
+                <p className='text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2'>Attention Focus</p>
+                <p className='text-2xl font-black text-blue-800 tracking-tighter uppercase'>
                   {neuroData?.payload?.metrics?.gaze_coords?.x > 0.4 && neuroData?.payload?.metrics?.gaze_coords?.x < 0.6 ? "On Target" : "Distracted"}
                 </p>
-                <p className='text-[8px] font-medium text-gray-400'>Coord: {neuroData?.payload?.metrics?.gaze_coords?.x}, {neuroData?.payload?.metrics?.gaze_coords?.y}</p>
+                <p className='text-[9px] font-bold text-gray-400 tracking-tighter mt-1'>X: {neuroData?.payload?.metrics?.gaze_coords?.x}, Y: {neuroData?.payload?.metrics?.gaze_coords?.y}</p>
               </div>
             </div>
 

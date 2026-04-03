@@ -19,16 +19,16 @@ export const useHistoryMqtt = () => {
       if (isMounted) {
         console.log('[LMS-History] 🌐 Terhubung ke Cloud, meminta data riwayat...');
         
-        // 1. Subscribe (dengarkan) balasan dari Python
-        client.subscribe('pandai/v1/history/response');
+        // 1. [V25.5.2] Subscribe (dengarkan) balasan spesifik dari PANDAI_NC_01
+        client.subscribe('pandai/v1/PANDAI_NC_01/history/response');
         
-        // 2. Publish (kirim permintaan) ke Python
-        client.publish('pandai/v1/history/request', 'GET_7_DAYS');
+        // 2. [V25.5.2] Publish (kirim permintaan) ke PANDAI_NC_01
+        client.publish('pandai/v1/PANDAI_NC_01/history/request', 'GET_7_DAYS');
       }
     });
 
     client.on('message', (topic, message) => {
-      if (topic === 'pandai/v1/history/response' && isMounted) {
+      if (topic === 'pandai/v1/PANDAI_NC_01/history/response' && isMounted) {
         try {
           // Mengubah string JSON dari Python menjadi Array Object React
           const parsedData = JSON.parse(message.toString());

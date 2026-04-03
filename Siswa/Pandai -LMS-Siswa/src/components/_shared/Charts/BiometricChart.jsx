@@ -19,42 +19,74 @@ export default function BiometricChart({ value, label, color = "#3B82F6", min = 
         }
     }, [value]);
 
-    // Format warna untuk gradient
-    const gradientId = useMemo(() => `color${label.replace(/\s/g, '')}`, [label]);
+    // [V25.6.2] Sanitize label to create a safe SVG ID
+    const gradientId = useMemo(() => `glow-${label.replace(/[^a-zA-Z0-9]/g, '')}`, [label]);
 
     return (
-        <div className="w-full h-40 mt-4 rounded-2xl overflow-hidden bg-white/30 backdrop-blur-md border border-white/20 p-2">
-            <div className="flex justify-between items-center mb-1 px-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
-                <span className="text-xs font-black" style={{ color }}>{value?.toFixed(2) || "0.00"}</span>
+        <div className="w-full h-44 mt-4 rounded-[28px] overflow-hidden bg-white/5 border border-white/10 p-4 shadow-xl relative group">
+            {/* Ambient Background Glow */}
+            <div className="absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-40" style={{ backgroundColor: color }}></div>
+            
+            <div className="flex justify-between items-center mb-4 relative z-10">
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: color }}></div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em]">{label}</span>
+                </div>
+                <div className="text-right">
+                   <span className="text-lg font-black tracking-tighter" style={{ color }}>{value?.toFixed(2) || "0.00"}</span>
+                </div>
             </div>
 
-            <ResponsiveContainer width="100%" height="80%">
-                <AreaChart data={history}>
-                    <defs>
-                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={color} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" opacity={0.5} />
-                    <XAxis dataKey="time" hide />
-                    <YAxis domain={[min, max]} hide />
-                    <Tooltip
-                        contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '10px' }}
-                        labelStyle={{ display: 'none' }}
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="val"
-                        stroke={color}
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill={`url(#${gradientId})`}
-                        isAnimationActive={false} // Atasi lag saat data masuk cepat
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-[90px] w-full relative z-10">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={history}>
+                        <defs>
+                            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+                                <stop offset="100%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                            
+                            {/* [V25.6.2] The 'Alive' Glow Filter */}
+                            <filter id={`glow-filter-${gradientId}`}>
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+                        
+                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="5 5" />
+                        <XAxis dataKey="time" hide />
+                        <YAxis domain={[min, max]} hide />
+                        
+                        {/* Glow Layer (Blurry) */}
+                        <Area
+                            type="monotone"
+                            dataKey="val"
+                            stroke={color}
+                            strokeWidth={4}
+                            strokeOpacity={0.3}
+                            fill="transparent"
+                            filter={`url(#glow-filter-${gradientId})`}
+                            isAnimationActive={false}
+                        />
+
+                        {/* Main Signal Line */}
+                        <Area
+                            type="monotone"
+                            dataKey="val"
+                            stroke={color}
+                            strokeWidth={2}
+                            fill={`url(#${gradientId})`}
+                            isAnimationActive={false}
+                            dot={false}
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+            
+            {/* Live Indicator */}
+            <div className="mt-2 flex items-center justify-end gap-1.5 opacity-30">
+                <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest italic">Live Telemetry Active</span>
+            </div>
         </div>
     );
 }

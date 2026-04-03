@@ -14,12 +14,14 @@ export const useNeuroMqtt = () => {
         client.on('connect', () => {
             if (!isMounted || client.disconnecting) return;
             setStatus('ONLINE');
-            client.subscribe('pandai/v1/bio/processed');
+            // [V25.5.1] Sync with PANDAI_NC_01 channel
+            client.subscribe('pandai/v1/PANDAI_NC_01/bio/processed');
         });
 
         client.on('message', (topic, message) => {
             if (!isMounted) return;
-            if (topic === 'pandai/v1/bio/processed') {
+            // [V25.5.1] Sync with PANDAI_NC_01 channel
+            if (topic === 'pandai/v1/PANDAI_NC_01/bio/processed') {
                 try {
                     setNeuroData(JSON.parse(message.toString()));
                 } catch (e) {

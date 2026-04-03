@@ -21,35 +21,18 @@ export default function GlobalIntervention({ children }) {
     const [isFaceLocked, setIsFaceLocked] = useState(false);
     const [faceTimer, setFaceTimer] = useState(10); // Countdown 10 detik
 
-    // LOGIKA MANDATORY CAMERA (Hard Lock 10 Detik)
+    // [V25.9.3] QUANTUM LOCK: Direct mapping from bioData to Lock State
     useEffect(() => {
-        let interval = null;
-
-        // Cek status deteksi wajah dari bioData (didapat dari Neuro-Client Python via MQTT)
         const isFaceDetected = bioData?.face_detected;
-
+        
         if (!isFaceDetected && !isSimulating) {
-            // Wajah Hilang: Mulai hitung mundur
-            interval = setInterval(() => {
-                setFaceTimer((prev) => {
-                    if (prev <= 1) {
-                        setIsFaceLocked(true);
-                        clearInterval(interval);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+            // Instant Lock
+            setIsFaceLocked(true);
         } else {
-            // Wajah Kembali: Lepaskan kunci dan reset timer
+            // Instant Unlock
             setIsFaceLocked(false);
-            setFaceTimer(10);
-            if (interval) clearInterval(interval);
+            setFaceTimer(10); // Reset for internal logic if needed
         }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
     }, [bioData?.face_detected, isSimulating]);
 
     // Mapping logic: DROWSY, HIGH_STRESS, FATIGUE, NORMAL
@@ -156,48 +139,44 @@ export default function GlobalIntervention({ children }) {
 
                         <h2 className="text-3xl font-black text-white mb-4 tracking-tight">KONTROL KAMERA AKTIF</h2>
 
-                         {!isFaceLocked ? (
-                            <div className="space-y-4">
                                 <p className="text-white/80 text-lg leading-relaxed">
-                                    PANDAI Shield tidak mendeteksi kehadiranmu. Keamanan belajar akan terkunci dalam:
+                                    PANDAI Shield tidak mendeteksi kehadiranmu! <br />
+                                    <strong>Sesi belajar telah dikunci secara otomatis.</strong>
                                 </p>
-                                <div className="text-6xl font-black text-white animate-bounce">
-                                    {faceTimer}s
+                                <div className="text-6xl font-black text-white py-4">
+                                     ⛔ SHIELD ACTIVE
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                <p className="text-white/80 text-lg leading-relaxed">
-                                    Sesi belajar ditangguhkan demi keamanan dan akurasi data. <br />
-                                    <strong>Mohon aktifkan kamera Laptop Anda dan posisikan wajah di depan layar.</strong>
-                                </p>
-                                <div className="flex items-center justify-center gap-3 py-4 bg-white/10 rounded-2xl border border-white/5">
-                                    <RefreshCcw size={20} className="text-white animate-spin" />
-                                    <span className="text-white font-bold uppercase tracking-widest text-xs">Menunggu Sinyal Neuro-Client...</span>
-                                </div>
-
-                                {/* CAMERA SELECTOR UI */}
-                                <div className="mt-8 pt-6 border-t border-white/10 space-y-4 text-left">
-                                    <label className="text-white/50 text-xs font-bold uppercase tracking-widest block px-2">Cek & Pilih Kamera Aktif:</label>
-                                    <div className="flex gap-2">
-                                        <select 
-                                            defaultValue={0}
-                                            onChange={(e) => switchCamera(parseInt(e.target.value))}
-                                            className="flex-1 bg-white/5 border border-white/10 text-white rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer hover:bg-white/10"
-                                        >
-                                            {bioData?.available_cameras?.length > 0 ? (
-                                                bioData.available_cameras.map((idx) => (
-                                                    <option key={idx} value={idx} className="bg-slate-900 py-2">📸 Gunakan Kamera {idx}</option>
-                                                ))
-                                            ) : (
-                                                <option className="bg-slate-900">Mencari Kamera...</option>
-                                            )}
-                                        </select>
+                                <div className="space-y-6">
+                                    <p className="text-white/80 text-lg leading-relaxed">
+                                        Sesi belajar ditangguhkan demi keamanan dan akurasi data. <br />
+                                        <strong>Mohon aktifkan kamera Laptop Anda dan posisikan wajah di depan layar.</strong>
+                                    </p>
+                                    <div className="flex items-center justify-center gap-3 py-4 bg-white/10 rounded-2xl border border-white/5">
+                                        <RefreshCcw size={20} className="text-white animate-spin" />
+                                        <span className="text-white font-bold uppercase tracking-widest text-xs">Menunggu Sinyal Neuro-Client...</span>
                                     </div>
-                                    <p className="text-[10px] text-white/30 px-2 italic text-center">Indeks kamera dideteksi otomatis oleh Neuro-Client Python.</p>
+
+                                    {/* CAMERA SELECTOR UI */}
+                                    <div className="mt-8 pt-6 border-t border-white/10 space-y-4 text-left">
+                                        <label className="text-white/50 text-xs font-bold uppercase tracking-widest block px-2">Cek & Pilih Kamera Aktif:</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                defaultValue={0}
+                                                onChange={(e) => switchCamera(parseInt(e.target.value))}
+                                                className="flex-1 bg-white/5 border border-white/10 text-white rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer hover:bg-white/10"
+                                            >
+                                                {bioData?.available_cameras?.length > 0 ? (
+                                                    bioData.available_cameras.map((idx) => (
+                                                        <option key={idx} value={idx} className="bg-slate-900 py-2">📸 Gunakan Kamera {idx}</option>
+                                                    ))
+                                                ) : (
+                                                    <option className="bg-slate-900">Mencari Kamera...</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <p className="text-[10px] text-white/30 px-2 italic text-center">Indeks kamera dideteksi otomatis oleh Neuro-Client Python.</p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
 
                         <div className="mt-8 pt-8 border-t border-white/10">
                             <p className="text-white/50 text-[10px] uppercase font-bold tracking-widest">PANDAI NeuroLearn Security Protocol v2.2</p>
