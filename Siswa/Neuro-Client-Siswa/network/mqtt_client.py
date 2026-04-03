@@ -111,20 +111,25 @@ class MQTTClient:
                     callback(topic, payload)
 
     def publish_processed_bio(self, session_id, metrics, hardware_state):
+        """[V25.4.2] Full Integrity Payload — Unlocks LMS Security Overlay."""
         if not self.connected: return False
         topic = f"{self.ROOT_TOPIC}/bio/processed"
         
-        from datetime import datetime, timezone
-        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        
+        # [V25.4.2] Mapping all fields required by GlobalIntervention.js and useNeuroListener.js
         payload = {
-            "header": {
-                "device_id": self.client_id, "session_id": session_id, "timestamp": timestamp
-            },
-            "payload": {
-                "metrics": metrics, "hardware_state": hardware_state
-            }
+            "device_id": self.client_id,
+            "session_id": session_id,
+            "focus_level": metrics.get("focus_level", metrics.get("ear_score", 0.5)),
+            "stress_level": metrics.get("stress_level", metrics.get("gsr_microsiemens", 0.0)),
+            "attention_index": metrics.get("attention_index", 0.0),
+            "face_detected": metrics.get("face_detected", False),       # REQUIRED TO UNLOCK UI
+            "available_cameras": metrics.get("available_cameras", []), # REQUIRED FOR DROPDOWN
+            "is_drowsy": metrics.get("is_drowsy", False),
+            "is_bored": metrics.get("is_bored", False),
+            "status": metrics.get("state", "NORMAL"),                  # Sync state
+            "timestamp": time.time()
         }
+        
         return self.publish(topic, payload, qos=0)
 
     def send_emergency_off(self):

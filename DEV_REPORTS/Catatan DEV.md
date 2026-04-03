@@ -49,10 +49,28 @@ Muncul `_tkinter.TclError: unknown color name "rgba(...)"`.
 
 ---
 
+## 🛰️ KASUS 4: LMS-SISWA INTEGRATION BRIDGE (The Handshake)
+### 🔍 Masalah: "LMS Stuck di Menunggu Sinyal / Kontrol Kamera Aktif"
+Meskipun Neuro-Client Python sudah aktif, Dashboard LMS (Next.js) tidak pernah membuka kunci layar belajar.
+
+### 🕵️ Akar Masalah:
+1.  **ID Alamat Salah (Mismatch)**: Python mengirim ke alamat dinamis (UUID), sementara LMS hanya mendengarkan alamat statis `PANDAI_NC_01`.
+2.  **Kunci Keamanan LMS (Security Lock)**: Komponen `GlobalIntervention.js` di LMS membutuhkan data `face_detected` dan `available_cameras` untuk membuka layar kunci. Karena data ini sebelumnya hilang dari sinyal Python, LMS menganggap sistem tidak siap.
+3.  **Bug Parsing di LMS**: File `useNeuroListener.js` secara tidak sengaja mengubah *status string* (seperti `NORMAL`) menjadi *objek*, sehingga perbandingan logika `state === 'FATIGUE'` selalu gagal.
+
+### ✅ Solusi:
+*   **Static Device ID**: Mengunci `config.py` Python ke ID **`PANDAI_NC_01`** (Identik dengan LMS).
+*   **Full Integrity Payload**: Memperbarui `mqtt_client.py` untuk mengirimkan paket lengkap: `face_detected`, `available_cameras`, dan `status`.
+*   **Harmonisasi hooks**: Memperbaiki `useNeuroListener.js` di LMS agar memisahkan antara `bioData` (angka) dan `neuroState` (status mental).
+
+---
+
 ## 🚩 ZONA MERAH (DILARANG KERAS DISENTUH!)
 Bagian kode ini telah divalidasi melalui 25 iterasi debugging. **JANGAN MERUBAH TANPA IZIN USER:**
 1.  **`sensors/vision_engine.py`**: Seluruh alur `_init_camera`, `_capture_thread`, dan `_process_loop`. Mengubahnya satu baris saja akan memicu *Race Condition* hardware.
 2.  **`pages/beranda.py`**: Logika `show_session_confirmation` dan `fg_color` overlay. State management di sini sangat sensitif terhadap perubahan.
+3.  **`Pandai -LMS-Siswa/src/hooks/useNeuroListener.js`**: Jangan mengubah logika `setNeuroState`.
+4.  **`Siswa/Neuro-Client-Siswa/config.py`**: Jangan mengubah `DEVICE_ID` menjad dinamis lagi jika ingin LMS tetap bisa "mengenali" perangkat.
 
 ## ✅ ZONA AMAN (BOLEH DIKEMBANGKAN)
 1.  **Analisis Data**: Penambahan logika perhitungan emosi atau gaze tracking di luar dasar yang sudah ada.

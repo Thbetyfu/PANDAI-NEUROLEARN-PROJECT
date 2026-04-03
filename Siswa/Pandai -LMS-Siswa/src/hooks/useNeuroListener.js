@@ -34,14 +34,13 @@ export function useNeuroListener() {
                 if (topic === PROCESSED_TOPIC) {
                     try {
                         const data = JSON.parse(message.toString());
+                        
+                        // [V25.4.3] Corrected state handling
                         setBioData(data);
-                        setNeuroState(prev => ({
-                            ...prev,
-                            focusLevel: data.focus_level || 0,
-                            stressLevel: data.stress_level || 0,
-                            isDrowsy: data.is_drowsy || false,
-                            isBored: data.is_bored || false
-                        }));
+                        if (data.status) {
+                            // Only update neuroState if the status string changes (to avoid over-renders)
+                            setNeuroState(data.status); 
+                        }
                     } catch (e) {
                         console.error('Error parsing MQTT message:', e);
                     }
