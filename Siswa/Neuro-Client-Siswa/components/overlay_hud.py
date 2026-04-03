@@ -392,6 +392,17 @@ class CameraWidget(tk.Toplevel):
             return
 
         try:
+            # [V18.5] Diagnostik Visual: Hitung frame untuk verifikasi aliran data
+            curr_fc = getattr(self.vision_engine, 'frame_received_count', 0)
+            if not hasattr(self, '_last_ui_fc'): self._last_ui_fc = -1
+            if not hasattr(self, '_stagnant_count'): self._stagnant_count = 0
+            
+            if curr_fc == self._last_ui_fc:
+                self._stagnant_count += 1
+            else:
+                self._stagnant_count = 0
+            self._last_ui_fc = curr_fc
+
             # [V7] Request SMALL frame directly to save CPU (No large resizes in UI thread)
             pil_img = self.vision_engine.get_frame(target_size=(200, 140))
             if pil_img is not None:
@@ -400,6 +411,8 @@ class CameraWidget(tk.Toplevel):
                 )
                 self.cam_label.configure(image=ctk_img, text="")
                 self._cam_img = ctk_img  # prevent GC
+            elif self._stagnant_count > 10:
+                self.cam_label.configure(text=f"⚠️ Kamera Freeze ({curr_fc})", image=None)
         except Exception:
             pass
 

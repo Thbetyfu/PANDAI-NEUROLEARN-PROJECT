@@ -74,17 +74,15 @@ class BerandaPage(ctk.CTkFrame):
         self._stopwatch_job = None
         self.hud_ref = None
         self.cam_ref = None
+        self.is_paused = False # [V21.9] Pause state for "Berhenti" confirmation
+        self.session_overlay = None # Reference for confirmation dialog
         
         # New: PDF Generator
         self.report_gen = ReportGenerator()
 
         # 1. MAIN SCROLLABLE AREA
-        self.scroll_frame = ctk.CTkScrollableFrame(
-            self, 
-            fg_color="transparent", 
-            corner_radius=0
-        )
-        self.scroll_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        self.scroll_frame.pack(fill="both", expand=True)
 
         # Content Inner Wrapper (Liquid Layout)
         self.inner = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
@@ -513,26 +511,17 @@ class BerandaPage(ctk.CTkFrame):
         )
 
     def toggle_session(self):
-        """
-        Toggle antara Mulai Sesi dan Berhenti.
-        
-        Flow:
-        1. Jika IDLE -> START:
-           - Reset stopwatch ke 00:00
-           - Mulai penghitungan waktu
-           - Ubah tombol menjadi "Berhenti" (merah)
-           - Spawn FloatingHUD + CameraWidget
-        
-        2. Jika ACTIVE -> STOP:
-           - Hentikan stopwatch
-           - Catat total durasi sesi (untuk dikirim ke server nanti)
-           - Ubah tombol kembali ke "Mulai Sesi" (ungu)
-           - Destroy HUD + Camera
-        """
+        """Toggle antara Mulai Sesi dan Berhenti (Dengan Konfirmasi)."""
         if not self.session_active:
-            self.start_session()
+            if self.elapsed_seconds > 0:
+                # Jika sudah ada waktu (Paused), maka Lanjutkan atau Reset
+                self.show_session_confirmation()
+            else:
+                self.start_session()
         else:
-            self.stop_session()
+            # Saat aktif ditekan Berhenti, kita PAUSE dan tanya
+            self.pause_session()
+            self.show_session_confirmation()
 
     def start_session(self):
         """
@@ -606,7 +595,7 @@ class BerandaPage(ctk.CTkFrame):
             "avg_focus": avg_focus,
             "max_load": 40,
             "dominant_emotion": dominant_emotion,
-            "security_status": "VERIFIED" if (not hasattr(self.engine.vision_engine, 'identity_verified') or self.engine.vision_engine.identity_verified) else "ALERT",
+            "security_status": "VERIFIED" if (not hasattr(self.engine.vision, 'identity_verified') or self.engine.vision.identity_verified) else "ALERT",
             "ai_insight": "Sesi belajar yang sangat produktif. Anda mempertahankan level fokus tinggi selama 78% dari total durasi."
         }
         self.report_gen.generate_session_report("Mozart", report_data)
@@ -627,24 +616,84 @@ class BerandaPage(ctk.CTkFrame):
         self._destroy_overlay()
 
     def _tick_stopwatch(self):
-        """
-        Callback yang dipanggil setiap 1 detik untuk mengupdate stopwatch.
-        
-        Flow setiap tick:
-        1. Tambah elapsed_seconds += 1
-        2. Gambar ulang ring canvas dengan waktu baru
-        3. Schedule tick berikutnya (after 1000ms)
-        
-        Tick akan terus berjalan selama self.session_active == True.
-        """
         if not self.session_active:
             return
         
         self.elapsed_seconds += 1
         self._draw_stopwatch_ring(self.elapsed_seconds)
-        
-        # Schedule tick berikutnya (1 detik = 1000ms)
         self._stopwatch_job = self.after(1000, self._tick_stopwatch)
+
+    def pause_session(self):
+        """Menunda sesi tanpa reset waktu."""
+        self.session_active = False
+        if self._stopwatch_job:
+            self.after_cancel(self._stopwatch_job)
+            self._stopwatch_job = None
+
+    def resume_session(self):
+        """Melanjutkan sesi belajar."""
+        if self.session_overlay:
+            self.session_overlay.destroy()
+            self.session_overlay = None
+            
+        self.session_active = True
+        self.session_btn.configure(text="\u23f9  Berhenti", fg_color="#DC2626", hover_color="#B91C1C")
+        self._tick_stopwatch()
+
+    def reset_session(self):
+        """Menghentikan sesi dan reset ke 0."""
+        if self.session_overlay:
+            self.session_overlay.destroy()
+            self.session_overlay = None
+            
+        self.session_active = False
+        self.elapsed_seconds = 0
+        if self._stopwatch_job:
+            self.after_cancel(self._stopwatch_job)
+            self._stopwatch_job = None
+            
+        self._draw_stopwatch_ring(0)
+        self.session_btn.configure(text="\u25b6  Mulai Sesi", fg_color="#4F46E5", hover_color="#3730A3")
+        self._destroy_overlay()
+
+    def show_session_confirmation(self):
+        """Overlay konfirmasi Glassmorphism (Top Level)."""
+        if self.session_overlay: return
+        
+        # [V22.0] Gunakan TopLevel Parent agar tidak tertutup scrollframe
+        parent = self.winfo_toplevel()
+        
+        # [V25.1] Fix: CustomTkinter doesn't support rgba(). Replaced with #0F172A.
+        self.session_overlay = ctk.CTkFrame(parent, fg_color="#0F172A", corner_radius=0)
+        self.session_overlay.place(relx=0.5, rely=0.5, anchor="center", relwidth=1.0, relheight=1.0)
+        self.session_overlay.lift() # Tampilkan paling depan
+        
+        content = ctk.CTkFrame(self.session_overlay, fg_color="white", corner_radius=20, width=400, height=250)
+        content.place(relx=0.5, rely=0.5, anchor="center")
+        content.pack_propagate(False)
+        
+        ctk.CTkLabel(content, text="Sesi Belajar Ditunda", 
+                     font=ctk.CTkFont(family="Plus Jakarta Sans", size=22, weight="bold"), 
+                     text_color="#0F172A").pack(pady=(40, 10))
+        
+        ctk.CTkLabel(content, text="Pilih tindakan untuk sesi ini:", 
+                     font=ctk.CTkFont(family="Inter", size=14), 
+                     text_color="#64748B").pack(pady=(0, 30))
+        
+        btn_cont = ctk.CTkFrame(content, fg_color="transparent")
+        btn_cont.pack()
+        
+        ctk.CTkButton(btn_cont, text="Lanjutkan", fg_color="#4F46E5", width=140, height=40,
+                      font=ctk.CTkFont(weight="bold"), command=self.resume_session).pack(side="left", padx=10)
+                      
+        ctk.CTkButton(btn_cont, text="Reset Ulang", fg_color="transparent", border_width=2,
+                      border_color="#F43F5E", text_color="#F43F5E", width=140, height=40,
+                      font=ctk.CTkFont(weight="bold"), command=self.reset_session).pack(side="left", padx=10)
+
+    def stop_session(self):
+        # Trigger confirmation flow
+        self.pause_session()
+        self.show_session_confirmation()
 
     # ================================================================
     # OVERLAY MANAGEMENT (HUD + KAMERA)

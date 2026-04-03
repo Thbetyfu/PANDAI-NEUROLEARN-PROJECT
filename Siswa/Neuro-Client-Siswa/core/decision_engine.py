@@ -81,6 +81,8 @@ class DecisionEngine:
             self.mqtt.add_callback(f"{self.mqtt.ROOT_TOPIC}/control/camera", self._handle_camera_control)
 
     def start(self):
+        """Memulai protokol kognitif (The Amigdala Loop)."""
+        if self.running: return
         print(f"[Engine] 🧠 Neuro-Architect Protocol Berjalan (Sesi: {self.session_id})")
         self.running = True
         
@@ -191,16 +193,20 @@ class DecisionEngine:
             return
 
         if self.vision and (now - self.vision.last_update_tick > 30.0):
-             raise VisionCriticalError("E05", "KAMERA TIDAK MERESPON: Frame gagal diupdate selama 30 detik terakhir.")
+             # [V18.7] Jangan lempar error jika vision sedang mencoba memulihkan diri (Scanner aktif)
+             if not getattr(self.vision, 'is_recovering', False):
+                raise VisionCriticalError("E05", "KAMERA TIDAK MERESPON: Frame gagal diupdate selama 30 detik terakhir.")
 
         # 4. Slow Systemic Audit: Diagnosa kesehatan modul (tiap 5 detik)
+        # [V22.2] Jangan lakukan audit jika sistem sedang di-suspend (Minimize)
         if (now - self.last_audit_timestamp) > 5.0:
-            IntegrityManager.check_health(self.vision, self.serial, self.mqtt)
+            if not self.is_suspended:
+                IntegrityManager.check_health(self.vision, self.serial, self.mqtt)
             self.last_audit_timestamp = now
 
         try:
             # 3. Vision Granular Check (EAR Suicide)
-            if self.vision:
+            if self.vision and not self.is_suspended:
                 raw_ear = self.vision.get_ear()
                 if raw_ear == 0.0 or raw_ear is None:
                     if self.ear_loss_timestamp is None:

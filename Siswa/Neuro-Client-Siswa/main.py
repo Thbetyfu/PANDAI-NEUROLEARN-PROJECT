@@ -41,15 +41,8 @@ class NeuroClientApp(ctk.CTk):
         self.geometry("1440x1024")
         self.configure(fg_color=COLOR_APP_BG)
 
-        # [STRICT FOCUS] SET CPU PRIORITY TO HIGH
-        # Memastikan Windows memberikan resource maksimal ke Neuro-Client
-        import psutil
-        try:
-            p = psutil.Process(os.getpid())
-            p.nice(psutil.HIGH_PRIORITY_CLASS)
-            print("[STRICT] 🚀 CPU Priority Set to HIGH.")
-        except Exception as e:
-            print(f"[STRICT] ⚠️ Gagal mengatur prioritas CPU: {e}")
+        # [V21.6] Standard Priority for Stability
+        print("[BOOT] 🚄 Running at Standard OS Priority.")
 
         # 1. Initialize Managers
         self.integrity_manager = None
@@ -170,6 +163,18 @@ class NeuroClientApp(ctk.CTk):
             if "Beranda" in self.pages:
                 self.pages["Beranda"].engine = self.engine
 
+        # [V17] Hapus overlay panic/splash if success
+        for child in self.winfo_children():
+            if isinstance(child, ctk.CTkFrame) and "!ctkframe" in child.winfo_name().lower():
+                # Avoid destroying critical permanent containers
+                if child not in [self.sidebar, self.main_container, self.view_container]:
+                    try: child.destroy()
+                    except: pass
+        
+        # Ensure Sidebar is visible
+        if self.sidebar and self.sidebar.winfo_exists():
+            self.sidebar.nav_frame.grid()
+
         # [V11] FORCE UI REFRESH
         self.update_idletasks()
         self.generate_and_place_aura()
@@ -195,17 +200,22 @@ class NeuroClientApp(ctk.CTk):
         container = ctk.CTkFrame(panic_overlay, fg_color="transparent")
         container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Icons based on error
-        icon = "📷" if error_code in ["E01", "E05"] else ("☁️" if error_code == "E03" else "🚨")
-        ctk.CTkLabel(container, text=icon, font=ctk.CTkFont(size=64)).pack(pady=(0, 20))
-
-        title = "KONFIGURASI KAMERA" if error_code in ["E01", "E05"] else ("HUBUNGKAN CLOUD" if error_code == "E03" else "GANGGUAN SISTEM")
+        title = "PANDAI Kamera Shield" if error_code in ["E01", "E05"] else ("HUBUNGKAN CLOUD" if error_code == "E03" else "GANGGUAN SISTEM")
         ctk.CTkLabel(container, text=title, font=ctk.CTkFont(family="Space Grotesk", size=42, weight="bold"), text_color="white").pack(pady=10)
         
+        # [V19] EMPATHY UPDATE: Pesan lebih manusiawi dan solutif
+        display_msg = message
+        if error_code in ["E01", "E05"]:
+            display_msg = (
+                "⚠️ KAMERA TERDETEKSI TAPI SIBUK / TERKUNCI\n\n"
+                "Kemungkinan besar kamera Anda sedang digunakan oleh Zoom, Meet, Teams, atau aplikasi lainnya.\n"
+                "Harap tutup aplikasi tersebut, pastikan lampu kamera menyala, lalu klik tombol di bawah."
+            )
+            
         error_box = ctk.CTkFrame(container, fg_color="#1E293B", corner_radius=24, border_width=1, border_color="#334155")
         error_box.pack(pady=20, padx=20, fill="both")
 
-        ctk.CTkLabel(error_box, text=message, font=ctk.CTkFont(family="Inter", size=18), 
+        ctk.CTkLabel(error_box, text=display_msg, font=ctk.CTkFont(family="Inter", size=18), 
                      text_color="#CBD5E1", wraplength=600, justify="center", padx=40, pady=40).pack()
 
         # --- RECOVERY ZONE ---
@@ -264,6 +274,17 @@ class NeuroClientApp(ctk.CTk):
         except:
             pass
 
+    def _async_boot_guard(self):
+        """[V10] Pengecekan Integritas di background agar UI tidak nge-freeze."""
+        try:
+            # Beri sedikit waktu untuk hardware warm-up
+            time.sleep(1.0) 
+            IntegrityManager.perform_boot_check(self.vision, self.serial, self.mqtt)
+            print("[GUARD] ✅ Integritas Terverifikasi. Sistem Siap.")
+        except Exception as e:
+            print(f"[GUARD] 🚨 Kegagalan Integritas: {e}")
+            self.after(0, lambda: self.show_panic_screen(str(e), error_code="E01"))
+
     def _restart_system_with_camera(self):
         """Membangkitkan kembali sistem dari layar Panic (Non-blocking)."""
         print(f"[RESTART] 🔄 Mencoba booting ulang dengan Kamera {self.selected_camera_index}...")
@@ -286,20 +307,6 @@ class NeuroClientApp(ctk.CTk):
         except Exception as e:
             print(f"[RESTART] Fatal: {e}")
             self.show_panic_screen(f"Gagal Pemulihan: {e}", error_code="SYS_FAIL")
-
-    def _on_boot_success(self):
-        self.security_token = True
-        print("[Security] 🛡️ Lockdown Diangkat. Pindah ke Dashboard.")
-        
-        # Hapus overlay panic if success (Recursively cleanup)
-        for child in self.winfo_children():
-            # Check for CTkFrame overlays starting with default naming
-            if isinstance(child, ctk.CTkFrame) and "!ctkframe" in child.winfo_name().lower():
-                  child.destroy()
-        
-        # Ensure Sidebar is visible
-        self.sidebar.nav_frame.grid()
-        self.select_page("Beranda")
 
     def init_core_systems(self, camera_index=None):
         print("="*60)
@@ -365,18 +372,18 @@ class NeuroClientApp(ctk.CTk):
             self.mqtt.disconnect()
         self.destroy()
 
-    def on_window_minimize(self, event):
-        """[STRICT-V9] Suspend monitoring saat di-minimize."""
-        # [V14] Filter: Hanya proses jika widget utama yang di-minimize, bukan sub-widget
-        if event.widget == self and hasattr(self, "engine") and self.engine:
-            print("[Lifecycle] 📉 Window Minimized. Suspending Watchdog...")
+    def on_window_minimize(self, event=None):
+        if event and event.widget != self: return
+        print("[Lifecycle] 📉 Window Minimized. Suspending Watchdog...")
+        if hasattr(self, 'vision') and self.vision:
+            self.vision.is_paused = True
             self.engine.is_suspended = True
 
-    def on_window_restore(self, event):
-        """[STRICT-V9] Resume monitoring saat diaktifkan kembali."""
-        # [V14] Filter: Hanya proses jika widget utama yang di-map
-        if event.widget == self and hasattr(self, "engine") and self.engine:
-            print("[Lifecycle] 📈 Window Restored. Resuming Watchdog...")
+    def on_window_restore(self, event=None):
+        if event and event.widget != self: return
+        print("[Lifecycle] 📈 Window Restored. Resuming Watchdog...")
+        if hasattr(self, 'vision') and self.vision:
+            self.vision.is_paused = False
             # [STRICT] Force heartbeat reset agar tidak kadaluarsa
             if self.vision:
                 self.vision.last_update_tick = time.time()
@@ -425,9 +432,6 @@ class NeuroClientApp(ctk.CTk):
             
             if overlay_to_remove:
                 overlay_to_remove.destroy()
-            
-            # 6. Lanjutkan Monitor Health
-            self.check_runtime_health()
             
             print("[UI] ✅ Kamera berhasil di-reset.")
             

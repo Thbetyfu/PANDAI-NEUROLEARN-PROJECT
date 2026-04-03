@@ -14,19 +14,19 @@ class IntegrityManager:
         Diagnosa awal seluruh komponen sistem.
         [MODIFIKASI: FOKUS VISION-ONLY UNTUK PENGEMBANGAN]
         """
-        print("[GUARD] 🛡️ Menjalankan Pemeriksaan Integritas Sistem...")
+        # print("[GUARD] 🛡️ Menjalankan Pemeriksaan Integritas Sistem...")
         
-        # 1. Cek Vision (Kamera) — WAJIB AKTIF (Dengan Retry 3x)
+        # 1. Cek Vision (Kamera) — WAJIB AKTIF (Dengan Retry 5x)
         vision_ok = False
-        for i in range(3):
+        for i in range(5):
             if vision and vision.is_camera_active():
                 vision_ok = True
                 break
-            print(f"[GUARD] ⚠️ Kamera belum siap, mencoba ulang ({i+1}/3)...")
-            time.sleep(1.5)
+            print(f"[GUARD] ⚠️ Menghubungkan Sensor Vision... Membangunkan kamera ({i+1}/5)...")
+            time.sleep(2.0)
             
         if not vision_ok:
-            raise VisionCriticalError("E01", "Kamera tidak terdeteksi atau sistem vision tidak aktif.")
+            raise VisionCriticalError("E01", "Kamera gagal dibangunkan (Hardware Timeout). Pastikan tidak digunakan aplikasi lain.")
 
         # 3. Cek Cloud (MQTT) — SEKARANG OPTIONAL (Graceful Degradation)
         # Broker publik seperti EMQX membutuhkan waktu handshake yang bervariasi.
@@ -49,5 +49,14 @@ class IntegrityManager:
 
     @staticmethod
     def check_health(vision, serial, mqtt):
-        """Alias untuk pemantauan runtime berkala."""
-        return IntegrityManager.perform_boot_check(vision, serial, mqtt)
+        """Audit runtime cerdas (Non-blocking & Toleran)."""
+        # [V22.2] Gunakan last_update_tick dari vision daripada is_camera_active instan
+        if vision:
+            import time
+            idle_duration = time.time() - vision.last_update_tick
+            
+            # Jika idle > 15 detik, baru kita nyatakan kritis (E01)
+            # Ini memberikan ruang bagi OS saat window di-minimize
+            if idle_duration > 15.0 and not getattr(vision, 'is_recovering', False):
+                 raise VisionCriticalError("E01", f"Sinyal kamera hilang selama {int(idle_duration)} detik.")
+        return True
